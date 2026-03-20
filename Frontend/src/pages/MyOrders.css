@@ -1,0 +1,287 @@
+.my-orders-container {
+  min-height: calc(100vh - 60px);
+  background: #0f0f0f;
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.my-orders-container h1 {
+  font-size: 32px;
+  color: #ffffff;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.orders-stats {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-width: 300px;
+}
+
+.stat {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  flex: 1;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  color: #b0b0b0;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 28px;
+  color: #0ea5e9;
+  font-weight: 600;
+}
+
+.btn-new-order {
+  padding: 12px 20px;
+  background: #0ea5e9;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  margin-bottom: 0;
+  width: auto;
+}
+
+.btn-new-order:hover {
+  background: #0284c7;
+  transform: translateY(-2px);
+}
+
+.filters {
+  margin-bottom: 30px;
+}
+
+.filter-select {
+  padding: 12px 15px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.order-card {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 25px;
+  transition: all 0.3s ease;
+}
+
+.order-card:hover {
+  border-color: #0ea5e9;
+  box-shadow: 0 5px 20px rgba(14, 165, 233, 0.2);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 20px;
+}
+
+.order-number {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.order-number h3 {
+  margin: 0;
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.order-status {
+  display: inline-block;
+  padding: 6px 12px;
+  border: 2px solid;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #b0b0b0;
+}
+
+.btn-view {
+  padding: 10px 20px;
+  background: #0ea5e9;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  margin-bottom: 0;
+  width: auto;
+}
+
+.btn-view:hover {
+  background: #0284c7;
+}
+
+.order-details {
+  background: #252525;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #333;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row .label {
+  color: #888;
+}
+
+.detail-row .value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.order-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-action {
+  flex: 1;
+  padding: 10px 15px;
+  background: #0ea5e9;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
+.btn-action:hover {
+  background: #0284c7;
+}
+
+.btn-action.btn-secondary {
+  background: #666;
+}
+
+.btn-action.btn-secondary:hover {
+  background: #555;
+}
+
+.no-orders {
+  text-align: center;
+  padding: 60px 20px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+}
+
+.no-orders p {
+  color: #b0b0b0;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.btn-create {
+  padding: 12px 30px;
+  background: #0ea5e9;
+  border: none;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-bottom: 0;
+}
+
+.btn-create:hover {
+  background: #0284c7;
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .orders-header {
+    flex-direction: column-reverse;
+  }
+
+  .orders-stats {
+    width: 100%;
+  }
+
+  .btn-new-order {
+    width: 100%;
+  }
+
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .order-number {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn-view {
+    width: 100%;
+  }
+
+  .order-actions {
+    flex-direction: column;
+  }
+}
