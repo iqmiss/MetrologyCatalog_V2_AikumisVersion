@@ -25,7 +25,7 @@ public class Order {
     @Column(columnDefinition = "ENUM('new','awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed')")
     private String status;
 
-    @Column(name = "total_price", nullable = false)
+    @Column(name = "total_price", nullable = false, columnDefinition = "DECIMAL(10,2)")
     private double totalPrice;
 
     @Column(name = "due_date")

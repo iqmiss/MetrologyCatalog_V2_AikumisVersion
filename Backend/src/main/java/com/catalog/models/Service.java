@@ -18,7 +18,7 @@ public class Service {
     @Column(name = "measurement_type")
     private String measurementType;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "DECIMAL(10,2)")
     private double price;
 
     @Column(name = "duration_days", nullable = false)

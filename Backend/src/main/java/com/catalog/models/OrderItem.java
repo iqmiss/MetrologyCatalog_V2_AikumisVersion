@@ -24,7 +24,7 @@ public class OrderItem {
     @Column(nullable = false)
     private int quantity;
 
-    @Column(name = "unit_price", nullable = false)
+    @Column(name = "unit_price", nullable = false, columnDefinition = "DECIMAL(10,2)")
     private double unitPrice;
 
     public OrderItem() {}
