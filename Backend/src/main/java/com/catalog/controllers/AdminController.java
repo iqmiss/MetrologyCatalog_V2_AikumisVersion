@@ -3,6 +3,7 @@ package com.catalog.controllers;
 import com.catalog.models.User;
 import com.catalog.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -11,6 +12,7 @@ import java.util.Map;
 
 // Контроллер для административного управления пользователями
 // Доступен только для роли admin — используется на странице AdminUsers
+@PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "http://localhost:5173")

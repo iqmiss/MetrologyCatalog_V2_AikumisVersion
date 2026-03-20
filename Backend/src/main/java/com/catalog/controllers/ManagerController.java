@@ -3,6 +3,7 @@ package com.catalog.controllers;
 import com.catalog.repository.OrderRepository;
 import com.catalog.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -10,15 +11,16 @@ import java.util.Map;
 
 // Контроллер для получения статистики системы
 // Используется на странице Dashboard для роли manager
+@PreAuthorize("hasRole('MANAGER')")
 @RestController
 @RequestMapping("/api/stats")
 @CrossOrigin(origins = "http://localhost:5173")
-public class StatsController {
+public class ManagerController {
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
 
-    public StatsController(OrderRepository orderRepository, UserRepository userRepository) {
+    public ManagerController(OrderRepository orderRepository, UserRepository userRepository) {
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
     }

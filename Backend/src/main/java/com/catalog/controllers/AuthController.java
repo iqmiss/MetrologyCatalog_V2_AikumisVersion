@@ -4,6 +4,7 @@ import com.catalog.models.User;
 import com.catalog.models.Company;
 import com.catalog.repository.UserRepository;
 import com.catalog.service.EmailService;
+import com.catalog.utils.JwtUtil;
 import com.catalog.repository.CompanyRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -21,12 +22,9 @@ public class AuthController {
 
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
-
-    // Сервис для отправки email (восстановление пароля)
-    private final EmailService emailService;
-
-    // Энкодер для хэширования паролей через алгоритм BCrypt
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final EmailService emailService; // Сервис для отправки email (восстановление пароля)
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(); // Энкодер для хэширования паролей через алгоритм BCrypt
+    private final JwtUtil jwtUtil;
 
     // Хранилище токенов для сброса пароля в памяти
     // Ключ — UUID токен, значение — email пользователя
@@ -36,10 +34,12 @@ public class AuthController {
     // Spring автоматически передаёт все зависимости через конструктор (Dependency Injection)
     public AuthController(UserRepository userRepository,
                           CompanyRepository companyRepository,
-                          EmailService emailService) {
+                          EmailService emailService,
+                          JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.companyRepository = companyRepository;
         this.emailService = emailService;
+        this.jwtUtil = jwtUtil;
     }
 
     // POST /api/auth/login
@@ -192,7 +192,7 @@ public class AuthController {
 
     // Генерирует простой токен сессии на основе ID пользователя и текущего времени
     private String generateToken(User user) {
-        return "token_" + user.getId() + "_" + System.currentTimeMillis();
+        return jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole());
     }
 
     // Вспомогательный метод для формирования ответа с ошибкой

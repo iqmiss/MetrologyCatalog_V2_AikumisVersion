@@ -3,6 +3,7 @@ package com.catalog.controllers;
 import com.catalog.models.Result;
 import com.catalog.repository.ResultRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -10,14 +11,15 @@ import java.util.Map;
 
 // Контроллер для управления результатами поверки
 // Метролог создаёт результат когда завершает заявку
+@PreAuthorize("hasRole('METROLOG')")
 @RestController
 @RequestMapping("/api/results")
 @CrossOrigin(origins = "http://localhost:5173")
-public class ResultController {
+public class MetrologyController {
 
     private final ResultRepository resultRepository;
 
-    public ResultController(ResultRepository resultRepository) {
+    public MetrologyController(ResultRepository resultRepository) {
         this.resultRepository = resultRepository;
     }
 
