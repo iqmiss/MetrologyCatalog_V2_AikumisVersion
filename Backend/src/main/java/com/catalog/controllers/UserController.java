@@ -66,7 +66,6 @@ public class UserController {
                 user.setEmail(request.getEmail());
             }
 
-            // JPA использует save() вместо update()
             userRepository.save(user);
 
             return ResponseEntity.ok(user);
