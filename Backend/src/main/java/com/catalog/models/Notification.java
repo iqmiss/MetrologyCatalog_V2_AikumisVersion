@@ -1,12 +1,31 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "notifications")
 public class Notification {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(name = "user_id", nullable = false)
     private int userId;
+
+    @Column(name = "order_id")
     private Integer orderId;
+
+    @Column(nullable = false)
     private String message;
+
+    @Column(name = "notification_type", columnDefinition = "ENUM('order_status','document_ready','reminder')")
     private String notificationType;
+
+    @Column(name = "is_read")
     private boolean isRead;
+
+    @Column(name = "read_at")
     private java.time.LocalDateTime readAt;
 
     public Notification() {}

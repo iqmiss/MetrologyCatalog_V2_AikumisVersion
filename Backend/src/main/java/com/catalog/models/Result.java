@@ -1,13 +1,34 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "results")
 public class Result {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(name = "order_id", nullable = false)
     private int orderId;
+
+    @Column(name = "result_type", columnDefinition = "ENUM('certificate','protocol','report')")
     private String resultType;
+
+    @Column(name = "issued_at")
     private java.time.LocalDateTime issuedAt;
+
+    @Column(name = "file_path")
     private String filePath;
+
+    @Column(name = "metrologist_id", nullable = false)
     private int metrologistId;
+
+    @Column(name = "is_signed")
     private boolean isSigned;
+
+    @Column(name = "signed_at")
     private java.time.LocalDateTime signedAt;
 
     public Result() {}

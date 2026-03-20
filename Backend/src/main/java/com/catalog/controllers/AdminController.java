@@ -48,14 +48,14 @@ public class AdminController {
             @RequestBody UpdateRoleRequest request
     ) {
         try {
-            User user = userRepository.findById(id);
+            User user = userRepository.findById(id).orElse(null);
             if (user == null) {
                 return ResponseEntity.status(404).body(errorResponse("Пользователь не найден"));
             }
 
             // Обновляем роль и сохраняем в БД
             user.setRole(request.getRole());
-            userRepository.update(user);
+            userRepository.save(user);
             return ResponseEntity.ok(user);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при смене роли"));
@@ -71,14 +71,14 @@ public class AdminController {
             @RequestBody UpdateActiveRequest request
     ) {
         try {
-            User user = userRepository.findById(id);
+            User user = userRepository.findById(id).orElse(null);
             if (user == null) {
                 return ResponseEntity.status(404).body(errorResponse("Пользователь не найден"));
             }
 
             // Обновляем статус активности и сохраняем в БД
             user.setActive(request.isActive());
-            userRepository.update(user);
+            userRepository.save(user);
             return ResponseEntity.ok(user);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при изменении статуса"));

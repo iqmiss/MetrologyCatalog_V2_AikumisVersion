@@ -1,9 +1,21 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "companies")
 public class Company {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(nullable = false, unique = true, length = 12)
     private String bin;
+
+    @Column(nullable = false)
     private String name;
+
     private String address;
     private String phone;
     private String email;
@@ -20,7 +32,7 @@ public class Company {
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
-
+    
     public String getBin() { return bin; }
     public void setBin(String bin) { this.bin = bin; }
 

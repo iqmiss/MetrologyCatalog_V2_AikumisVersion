@@ -1,12 +1,31 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "contracts")
 public class Contract {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(name = "order_id", nullable = false, unique = true)
     private int orderId;
+
+    @Column(name = "contract_number", nullable = false, unique = true)
     private String contractNumber;
+
+    @Column(name = "signed_at")
     private java.time.LocalDateTime signedAt;
+
+    @Column(name = "file_path")
     private String filePath;
+
+    @Column(name = "is_signed")
     private boolean isSigned;
+
+    @Column(name = "signed_by")
     private Integer signedBy;
 
     public Contract() {}
@@ -19,7 +38,7 @@ public class Contract {
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
-
+    
     public int getOrderId() { return orderId; }
     public void setOrderId(int orderId) { this.orderId = orderId; }
 

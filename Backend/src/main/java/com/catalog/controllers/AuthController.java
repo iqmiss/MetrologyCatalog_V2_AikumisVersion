@@ -53,7 +53,7 @@ public class AuthController {
         }
 
         // Ищем пользователя по email
-        User user = userRepository.findByEmail(request.getEmail());
+        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
         if (user == null) {
             return ResponseEntity.status(401).body(errorResponse("Пользователь не найден"));
         }
@@ -92,7 +92,7 @@ public class AuthController {
         }
 
         // Проверяем что email ещё не зарегистрирован
-        User existingUser = userRepository.findByEmail(request.getEmail());
+        User existingUser = userRepository.findByEmail(request.getEmail()).orElse(null);
         if (existingUser != null) {
             return ResponseEntity.status(409).body(errorResponse("Email уже зарегистрирован"));
         }
@@ -109,7 +109,7 @@ public class AuthController {
             companyRepository.save(company);
 
             // Получаем сохранённую компанию чтобы узнать её id
-            Company savedCompany = companyRepository.findByBin(request.getBin());
+            Company savedCompany = companyRepository.findByBin(request.getBin()).orElse(null);
             if (savedCompany != null) {
                 companyId = savedCompany.getId();
             }
@@ -127,7 +127,7 @@ public class AuthController {
         userRepository.save(user);
 
         // Возвращаем токен и данные созданного пользователя
-        User createdUser = userRepository.findByEmail(request.getEmail());
+        User createdUser = userRepository.findByEmail(request.getEmail()).orElse(null);
         String token = generateToken(createdUser);
         Map<String, Object> response = new HashMap<>();
         response.put("token", token);
@@ -145,7 +145,7 @@ public class AuthController {
             return ResponseEntity.status(400).body(errorResponse("Email обязателен"));
         }
 
-        User user = userRepository.findByEmail(request.getEmail());
+        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
         if (user == null) {
             // Не раскрываем что пользователь не найден — защита от перебора email
             return ResponseEntity.ok(Map.of("message", "Ссылка отправлена на email если он зарегистрирован"));
@@ -177,14 +177,14 @@ public class AuthController {
             return ResponseEntity.status(400).body(errorResponse("Недействительный или устаревший токен"));
         }
 
-        User user = userRepository.findByEmail(email);
+        User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) {
             return ResponseEntity.status(404).body(errorResponse("Пользователь не найден"));
         }
 
         // Обновляем пароль с BCrypt хэшированием и удаляем использованный токен
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        userRepository.update(user);
+        userRepository.save(user);
         resetTokens.remove(request.getToken());
 
         return ResponseEntity.ok(Map.of("message", "Пароль успешно изменён"));

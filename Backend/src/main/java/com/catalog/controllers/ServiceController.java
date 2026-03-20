@@ -20,12 +20,12 @@ public class ServiceController {
     }
 
     // GET /api/services
-    // Возвращает список всех активных услуг с JOIN на таблицу laboratories
-    // (включает название лаборатории и нормативный документ ГОСТ)
+    // Возвращает список всех активных услуг
+    // labName заполняется через @Transient — не хранится в БД
     @GetMapping
     public ResponseEntity<?> getAllServices() {
         try {
-            List<Service> services = serviceRepository.findAll();
+            List<Service> services = serviceRepository.findByIsActiveTrue();
             return ResponseEntity.ok(services);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при получении услуг"));
@@ -37,7 +37,7 @@ public class ServiceController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getServiceById(@PathVariable int id) {
         try {
-            Service service = serviceRepository.findById(id);
+            Service service = serviceRepository.findById(id).orElse(null);
 
             // Если услуга не найдена — возвращаем 404
             if (service == null) {
@@ -56,7 +56,7 @@ public class ServiceController {
     @GetMapping("/type/{measurementType}")
     public ResponseEntity<?> getByMeasurementType(@PathVariable String measurementType) {
         try {
-            List<Service> services = serviceRepository.findByMeasurementType(measurementType);
+            List<Service> services = serviceRepository.findByMeasurementTypeAndIsActiveTrue(measurementType);
             return ResponseEntity.ok(services);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при фильтрации услуг"));
@@ -68,7 +68,7 @@ public class ServiceController {
     @GetMapping("/lab/{labId}")
     public ResponseEntity<?> getByLabId(@PathVariable int labId) {
         try {
-            List<Service> services = serviceRepository.findByLabId(labId);
+            List<Service> services = serviceRepository.findByLabIdAndIsActiveTrue(labId);
             return ResponseEntity.ok(services);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при получении услуг лаборатории"));

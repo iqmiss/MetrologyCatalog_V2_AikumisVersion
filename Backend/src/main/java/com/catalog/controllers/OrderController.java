@@ -62,7 +62,7 @@ public class OrderController {
     @GetMapping("/{id}")
     public ResponseEntity<?> getOrderById(@PathVariable int id) {
         try {
-            Order order = orderRepository.findById(id);
+            Order order = orderRepository.findById(id).orElse(null);
             if (order == null) {
                 return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
             }
@@ -178,7 +178,7 @@ public class OrderController {
             contractRepository.save(contract);
 
             // Возвращаем созданную заявку из БД
-            Order createdOrder = orderRepository.findById(order.getId());
+            Order createdOrder = orderRepository.findById(order.getId()).orElse(null);
             return ResponseEntity.status(201).body(createdOrder);
         } catch (Exception e) {
             e.printStackTrace();
@@ -204,17 +204,17 @@ public class OrderController {
                 return ResponseEntity.status(400).body(errorResponse("Недопустимый статус: " + request.getStatus()));
             }
 
-            Order order = orderRepository.findById(id);
+            Order order = orderRepository.findById(id).orElse(null);
             if (order == null) {
                 return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
             }
 
             // Обновляем статус в БД
             order.setStatus(request.getStatus());
-            orderRepository.update(order);
+            orderRepository.save(order);
 
             // Отправляем email уведомление клиенту об изменении статуса
-            User client = userRepository.findById(order.getClientId());
+            User client = userRepository.findById(order.getClientId()).orElse(null);
             if (client != null && client.getEmail() != null) {
                 if ("completed".equals(request.getStatus())) {
                     // Специальное письмо когда заявка завершена

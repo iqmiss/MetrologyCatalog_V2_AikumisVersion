@@ -117,10 +117,10 @@ public class PdfService {
     // Вызывается из PdfController.downloadCertificate()
     public byte[] generateCertificate(int orderId) {
         // Получаем данные заявки и результата из БД
-        Order order = orderRepository.findById(orderId);
+        Order order = orderRepository.findById(orderId).orElse(null);
         if (order == null) throw new RuntimeException("Order not found: " + orderId);
 
-        Result result = resultRepository.findByOrderId(orderId);
+        Result result = resultRepository.findByOrderId(orderId).orElse(null);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 

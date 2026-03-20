@@ -25,7 +25,8 @@ public class UserController {
     @GetMapping
     public ResponseEntity<?> getProfile(@RequestParam int userId) {
         try {
-            User user = userRepository.findById(userId);
+            // findById теперь возвращает Optional — используем orElse(null)
+            User user = userRepository.findById(userId).orElse(null);
 
             // Если пользователь не найден — возвращаем 404
             if (user == null) {
@@ -49,7 +50,7 @@ public class UserController {
             }
 
             // Ищем пользователя в БД
-            User user = userRepository.findById(request.getId());
+            User user = userRepository.findById(request.getId()).orElse(null);
             if (user == null) {
                 return ResponseEntity.status(404).body(errorResponse("Пользователь не найден"));
             }
@@ -65,8 +66,8 @@ public class UserController {
                 user.setEmail(request.getEmail());
             }
 
-            // Сохраняем изменения в БД
-            userRepository.update(user);
+            // JPA использует save() вместо update()
+            userRepository.save(user);
 
             return ResponseEntity.ok(user);
         } catch (Exception e) {

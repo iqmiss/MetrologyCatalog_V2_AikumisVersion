@@ -1,15 +1,39 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "services")
 public class Service {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(nullable = false)
     private String name;
+
     private String description;
+
+    @Column(name = "measurement_type")
     private String measurementType;
+
+    @Column(nullable = false)
     private double price;
+
+    @Column(name = "duration_days", nullable = false)
     private int durationDays;
+
+    @Column(name = "lab_id", nullable = false)
     private int labId;
+
+    @Column(name = "is_active")
     private boolean isActive;
+
     private String standard;
+
+    // Не хранится в БД — заполняется через JOIN в ServiceRepository
+    @Transient
     private String labName;
 
     public Service() {}
@@ -50,7 +74,7 @@ public class Service {
 
     public String getStandard() { return standard; }
     public void setStandard(String standard) { this.standard = standard; }
-
+    
     public String getLabName() { return labName; }
     public void setLabName(String labName) { this.labName = labName; }
 }

@@ -149,11 +149,6 @@ export default function Header() {
                     👥 Пользователи
                   </button>
                 </li>
-                <li>
-                  <button onClick={() => navigateTo('/catalog')}>
-                    📋 Каталог услуг
-                  </button>
-                </li>
               </ul>
             </div>
           )}

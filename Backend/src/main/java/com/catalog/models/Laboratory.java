@@ -1,11 +1,24 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "laboratories")
 public class Laboratory {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(nullable = false)
     private String name;
+
     private String address;
+
     private String phone;
+
     private String city;
+    
     private String email;
 
     public Laboratory() {}

@@ -41,7 +41,7 @@ public class ContractController {
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getContract(@PathVariable int orderId) {
         try {
-            Contract contract = contractRepository.findByOrderId(orderId);
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
             if (contract == null) {
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
             }
@@ -58,14 +58,14 @@ public class ContractController {
     public ResponseEntity<?> createContract(@PathVariable int orderId) {
         try {
             // Проверяем нет ли уже договора для этой заявки (уникальность по order_id)
-            Contract existing = contractRepository.findByOrderId(orderId);
+            Contract existing = contractRepository.findByOrderId(orderId).orElse(null);
             if (existing != null) {
                 // Если договор уже есть — возвращаем существующий
                 return ResponseEntity.ok(existing);
             }
 
             // Проверяем что заявка существует
-            Order order = orderRepository.findById(orderId);
+            Order order = orderRepository.findById(orderId).orElse(null);
             if (order == null) {
                 return ResponseEntity.status(404).body(Map.of("message", "Заявка не найдена"));
             }
@@ -78,7 +78,7 @@ public class ContractController {
             contractRepository.save(contract);
 
             // Возвращаем сохранённый договор с присвоенным id
-            Contract saved = contractRepository.findByOrderId(orderId);
+            Contract saved = contractRepository.findByOrderId(orderId).orElse(null);
             return ResponseEntity.status(201).body(saved);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Ошибка при создании договора"));
@@ -91,7 +91,7 @@ public class ContractController {
     @PutMapping("/{orderId}/sign")
     public ResponseEntity<?> signContract(@PathVariable int orderId, @RequestBody SignRequest request) {
         try {
-            Contract contract = contractRepository.findByOrderId(orderId);
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
             if (contract == null) {
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
             }
@@ -100,7 +100,7 @@ public class ContractController {
             contract.setSigned(true);
             contract.setSignedAt(LocalDateTime.now());
             contract.setSignedBy(request.getUserId());
-            contractRepository.update(contract);
+            contractRepository.save(contract);
 
             return ResponseEntity.ok(contract);
         } catch (Exception e) {
@@ -114,8 +114,8 @@ public class ContractController {
     @GetMapping("/{orderId}/download")
     public ResponseEntity<byte[]> downloadContract(@PathVariable int orderId) {
         try {
-            Contract contract = contractRepository.findByOrderId(orderId);
-            Order order = orderRepository.findById(orderId);
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            Order order = orderRepository.findById(orderId).orElse(null);
 
             if (contract == null || order == null) {
                 return ResponseEntity.status(404).build();

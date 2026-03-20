@@ -1,13 +1,33 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "users")
 public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(nullable = false, unique = true)
     private String email;
+
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
+
+    @Column(nullable = false, columnDefinition = "ENUM('client','metrolog','manager','admin')")
     private String role;
+
+    @Column(name = "company_id")
     private Integer companyId;
+
+    @Column(name = "full_name")
     private String fullName;
+
     private String phone;
+
+    @Column(name = "is_active")
     private boolean isActive;
 
     public User() {}

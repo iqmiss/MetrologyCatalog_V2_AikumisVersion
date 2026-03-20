@@ -1,12 +1,30 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "devices")
 public class Device {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(name = "company_id", nullable = false)
     private int companyId;
+
+    @Column(nullable = false)
     private String type;
+
     private String model;
+
+    @Column(name = "serial_number", nullable = false, unique = true)
     private String serialNumber;
+
+    @Column(name = "last_verified_at")
     private java.time.LocalDateTime lastVerifiedAt;
+
+    @Column(name = "next_verification_date")
     private java.time.LocalDate nextVerificationDate;
 
     public Device() {}
@@ -20,7 +38,7 @@ public class Device {
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
-
+    
     public int getCompanyId() { return companyId; }
     public void setCompanyId(int companyId) { this.companyId = companyId; }
 

@@ -29,11 +29,14 @@ public class ManagerController {
     @GetMapping
     public ResponseEntity<?> getStats() {
         try {
-            // Все агрегаты считаются одним SQL запросом на стороне БД
-            Map<String, Object> stats = orderRepository.getStats();
-
-            // Количество клиентов — отдельный быстрый COUNT запрос
-            stats.put("totalClients", userRepository.countClients());
+            Map<String, Object> stats = new java.util.HashMap<>();
+            stats.put("totalOrders", orderRepository.count());
+            stats.put("completedOrders", orderRepository.countByStatus("completed"));
+            stats.put("inWorkOrders", orderRepository.countByStatus("in_work"));
+            stats.put("newOrders", orderRepository.countByStatus("new"));
+            stats.put("awaitingPayment", orderRepository.countByStatus("awaiting_payment"));
+            stats.put("totalRevenue", orderRepository.sumRevenue());
+            stats.put("totalClients", userRepository.countByRole("client"));
 
             return ResponseEntity.ok(stats);
         } catch (Exception e) {

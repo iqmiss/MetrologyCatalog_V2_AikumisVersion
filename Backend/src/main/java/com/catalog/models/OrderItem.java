@@ -1,12 +1,30 @@
 package com.catalog.models;
 
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "order_items")
 public class OrderItem {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
+
+    @Column(name = "order_id", nullable = false)
     private int orderId;
+
+    @Column(name = "device_type", nullable = false)
     private String deviceType;
+
     private String model;
+
+    @Column(name = "serial_number", nullable = false)
     private String serialNumber;
+
+    @Column(nullable = false)
     private int quantity;
+
+    @Column(name = "unit_price", nullable = false)
     private double unitPrice;
 
     public OrderItem() {}
@@ -37,7 +55,7 @@ public class OrderItem {
 
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
-
+    
     public double getUnitPrice() { return unitPrice; }
     public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
 }
