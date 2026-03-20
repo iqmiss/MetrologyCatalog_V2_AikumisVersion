@@ -20,12 +20,11 @@ public class NotificationRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Notification notification = mapResultSetToNotification(rs);
-                notifications.add(notification);
+                notifications.add(mapResultSetToNotification(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех уведомлений", e);
         }
 
         return notifications;
@@ -33,25 +32,23 @@ public class NotificationRepository {
 
     public Notification findById(int id) {
         String sql = "SELECT * FROM notifications WHERE id = ?";
-        Notification notification = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    notification = mapResultSetToNotification(rs);
-                }
+                if (rs.next()) return mapResultSetToNotification(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении уведомления id=" + id, e);
         }
 
-        return notification;
+        return null;
     }
 
+    // Получение всех уведомлений пользователя — отсортированы по дате (новые первые)
     public List<Notification> findByUserId(int userId) {
         List<Notification> notifications = new ArrayList<>();
         String sql = "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC";
@@ -62,18 +59,18 @@ public class NotificationRepository {
             stmt.setInt(1, userId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Notification notification = mapResultSetToNotification(rs);
-                    notifications.add(notification);
+                    notifications.add(mapResultSetToNotification(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении уведомлений пользователя id=" + userId, e);
         }
 
         return notifications;
     }
 
+    // Получение только непрочитанных уведомлений — используется для счётчика в шапке
     public List<Notification> findUnreadByUserId(int userId) {
         List<Notification> notifications = new ArrayList<>();
         String sql = "SELECT * FROM notifications WHERE user_id = ? AND is_read = false ORDER BY created_at DESC";
@@ -84,13 +81,12 @@ public class NotificationRepository {
             stmt.setInt(1, userId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Notification notification = mapResultSetToNotification(rs);
-                    notifications.add(notification);
+                    notifications.add(mapResultSetToNotification(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении непрочитанных уведомлений пользователя id=" + userId, e);
         }
 
         return notifications;
@@ -110,7 +106,7 @@ public class NotificationRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении уведомления", e);
         }
     }
 
@@ -129,10 +125,11 @@ public class NotificationRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении уведомления id=" + notification.getId(), e);
         }
     }
 
+    // Отмечает уведомление прочитанным — устанавливает is_read=true и фиксирует время прочтения
     public void markAsRead(int id) {
         String sql = "UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = ?";
 
@@ -143,7 +140,7 @@ public class NotificationRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при отметке уведомления прочитанным id=" + id, e);
         }
     }
 
@@ -157,7 +154,7 @@ public class NotificationRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении уведомления id=" + id, e);
         }
     }
 

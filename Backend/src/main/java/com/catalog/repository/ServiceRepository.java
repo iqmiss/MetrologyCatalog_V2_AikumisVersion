@@ -11,6 +11,8 @@ import java.util.List;
 @Repository
 public class ServiceRepository {
 
+    // JOIN с таблицей laboratories чтобы получить название лаборатории
+    // и нормативный документ (ГОСТ) для отображения в каталоге
     public List<Service> findAll() {
         List<Service> services = new ArrayList<>();
         String sql = "SELECT s.*, l.name as lab_name FROM services s " +
@@ -26,7 +28,7 @@ public class ServiceRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех услуг", e);
         }
 
         return services;
@@ -36,25 +38,23 @@ public class ServiceRepository {
         String sql = "SELECT s.*, l.name as lab_name FROM services s " +
                     "LEFT JOIN laboratories l ON s.lab_id = l.id " +
                     "WHERE s.id = ?";
-        Service service = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
             PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    service = mapResultSetToService(rs);
-                }
+                if (rs.next()) return mapResultSetToService(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении услуги id=" + id, e);
         }
 
-        return service;
+        return null;
     }
 
+    // Фильтрация услуг по типу средства измерений — используется в каталоге
     public List<Service> findByMeasurementType(String measurementType) {
         List<Service> services = new ArrayList<>();
         String sql = "SELECT s.*, l.name as lab_name FROM services s " +
@@ -72,7 +72,7 @@ public class ServiceRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при фильтрации услуг по типу=" + measurementType, e);
         }
 
         return services;
@@ -95,25 +95,10 @@ public class ServiceRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении услуг лаборатории id=" + labId, e);
         }
 
         return services;
-    }
-
-    private Service mapResultSetToService(ResultSet rs) throws SQLException {
-        Service service = new Service();
-        service.setId(rs.getInt("id"));
-        service.setName(rs.getString("name"));
-        service.setDescription(rs.getString("description"));
-        service.setMeasurementType(rs.getString("measurement_type"));
-        service.setPrice(rs.getDouble("price"));
-        service.setDurationDays(rs.getInt("duration_days"));
-        service.setLabId(rs.getInt("lab_id"));
-        service.setActive(rs.getBoolean("is_active"));
-        service.setStandard(rs.getString("standard"));
-        service.setLabName(rs.getString("lab_name"));
-        return service;
     }
 
     public void save(Service service) {
@@ -132,7 +117,7 @@ public class ServiceRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении услуги", e);
         }
     }
 
@@ -153,7 +138,7 @@ public class ServiceRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении услуги id=" + service.getId(), e);
         }
     }
 
@@ -167,7 +152,22 @@ public class ServiceRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении услуги id=" + id, e);
         }
+    }
+
+    private Service mapResultSetToService(ResultSet rs) throws SQLException {
+        Service service = new Service();
+        service.setId(rs.getInt("id"));
+        service.setName(rs.getString("name"));
+        service.setDescription(rs.getString("description"));
+        service.setMeasurementType(rs.getString("measurement_type"));
+        service.setPrice(rs.getDouble("price"));
+        service.setDurationDays(rs.getInt("duration_days"));
+        service.setLabId(rs.getInt("lab_id"));
+        service.setActive(rs.getBoolean("is_active"));
+        service.setStandard(rs.getString("standard"));
+        service.setLabName(rs.getString("lab_name"));
+        return service;
     }
 }

@@ -20,12 +20,11 @@ public class DeviceRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Device device = mapResultSetToDevice(rs);
-                devices.add(device);
+                devices.add(mapResultSetToDevice(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех приборов", e);
         }
 
         return devices;
@@ -33,46 +32,43 @@ public class DeviceRepository {
 
     public Device findById(int id) {
         String sql = "SELECT * FROM devices WHERE id = ?";
-        Device device = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    device = mapResultSetToDevice(rs);
-                }
+                if (rs.next()) return mapResultSetToDevice(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении прибора id=" + id, e);
         }
 
-        return device;
+        return null;
     }
 
+    // Поиск прибора по заводскому серийному номеру
+    // Серийный номер уникален — используется для идентификации прибора при повторных поверках
     public Device findBySerialNumber(String serialNumber) {
         String sql = "SELECT * FROM devices WHERE serial_number = ?";
-        Device device = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, serialNumber);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    device = mapResultSetToDevice(rs);
-                }
+                if (rs.next()) return mapResultSetToDevice(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при поиске прибора по серийному номеру=" + serialNumber, e);
         }
 
-        return device;
+        return null;
     }
 
+    // Получение всех приборов компании — используется для реестра средств измерений
     public List<Device> findByCompanyId(int companyId) {
         List<Device> devices = new ArrayList<>();
         String sql = "SELECT * FROM devices WHERE company_id = ?";
@@ -83,13 +79,12 @@ public class DeviceRepository {
             stmt.setInt(1, companyId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Device device = mapResultSetToDevice(rs);
-                    devices.add(device);
+                    devices.add(mapResultSetToDevice(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении приборов компании id=" + companyId, e);
         }
 
         return devices;
@@ -105,13 +100,12 @@ public class DeviceRepository {
             stmt.setString(1, type);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Device device = mapResultSetToDevice(rs);
-                    devices.add(device);
+                    devices.add(mapResultSetToDevice(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при фильтрации приборов по типу=" + type, e);
         }
 
         return devices;
@@ -132,7 +126,7 @@ public class DeviceRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении прибора", e);
         }
     }
 
@@ -152,7 +146,7 @@ public class DeviceRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении прибора id=" + device.getId(), e);
         }
     }
 
@@ -166,7 +160,7 @@ public class DeviceRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении прибора id=" + id, e);
         }
     }
 

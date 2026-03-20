@@ -33,7 +33,7 @@ public class UserRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех пользователей", e);
         }
 
         return users;
@@ -62,7 +62,7 @@ public class UserRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении пользователя id=" + id, e);
         }
 
         return user;
@@ -91,10 +91,28 @@ public class UserRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении email=" + email, e);
         }
 
         return user;
+    }
+
+    public long countClients() {
+        String sql = "SELECT COUNT(*) FROM users WHERE role = 'client'";
+
+        try (Connection conn = DatabaseUtil.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Ошибка при подсчёте клиентов", e);
+        }
+
+        return 0;
     }
 
     public void save(User user) {
@@ -113,7 +131,7 @@ public class UserRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении пользователя", e);
         }
     }
 
@@ -134,7 +152,7 @@ public class UserRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении данных о пользователе", e);
         }
     }
 
@@ -148,7 +166,7 @@ public class UserRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении пользователя", e);
         }
     }
 }

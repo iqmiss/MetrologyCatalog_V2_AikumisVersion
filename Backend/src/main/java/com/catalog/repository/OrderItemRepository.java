@@ -20,12 +20,11 @@ public class OrderItemRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                OrderItem item = mapResultSetToOrderItem(rs);
-                items.add(item);
+                items.add(mapResultSetToOrderItem(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех позиций заявок", e);
         }
 
         return items;
@@ -33,25 +32,23 @@ public class OrderItemRepository {
 
     public OrderItem findById(int id) {
         String sql = "SELECT * FROM order_items WHERE id = ?";
-        OrderItem item = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    item = mapResultSetToOrderItem(rs);
-                }
+                if (rs.next()) return mapResultSetToOrderItem(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении позиции заявки id=" + id, e);
         }
 
-        return item;
+        return null;
     }
 
+    // Получение всех приборов в заявке — один заказ может содержать несколько приборов
     public List<OrderItem> findByOrderId(int orderId) {
         List<OrderItem> items = new ArrayList<>();
         String sql = "SELECT * FROM order_items WHERE order_id = ?";
@@ -62,13 +59,12 @@ public class OrderItemRepository {
             stmt.setInt(1, orderId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    OrderItem item = mapResultSetToOrderItem(rs);
-                    items.add(item);
+                    items.add(mapResultSetToOrderItem(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении позиций заявки id=" + orderId, e);
         }
 
         return items;
@@ -89,7 +85,7 @@ public class OrderItemRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении позиции заявки", e);
         }
     }
 
@@ -109,7 +105,7 @@ public class OrderItemRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении позиции заявки id=" + item.getId(), e);
         }
     }
 
@@ -123,7 +119,7 @@ public class OrderItemRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении позиции заявки id=" + id, e);
         }
     }
 

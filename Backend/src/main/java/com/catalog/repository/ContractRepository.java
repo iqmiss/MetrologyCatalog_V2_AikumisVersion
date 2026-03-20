@@ -20,12 +20,11 @@ public class ContractRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Contract contract = mapResultSetToContract(rs);
-                contracts.add(contract);
+                contracts.add(mapResultSetToContract(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех договоров", e);
         }
 
         return contracts;
@@ -33,44 +32,40 @@ public class ContractRepository {
 
     public Contract findById(int id) {
         String sql = "SELECT * FROM contracts WHERE id = ?";
-        Contract contract = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    contract = mapResultSetToContract(rs);
-                }
+                if (rs.next()) return mapResultSetToContract(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении договора id=" + id, e);
         }
 
-        return contract;
+        return null;
     }
 
+    // Поиск договора по ID заявки — используется в ContractController
+    // так как договор всегда привязан к заявке (один к одному)
     public Contract findByOrderId(int orderId) {
         String sql = "SELECT * FROM contracts WHERE order_id = ?";
-        Contract contract = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, orderId);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    contract = mapResultSetToContract(rs);
-                }
+                if (rs.next()) return mapResultSetToContract(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении договора для заявки id=" + orderId, e);
         }
 
-        return contract;
+        return null;
     }
 
     public void save(Contract contract) {
@@ -88,7 +83,7 @@ public class ContractRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении договора", e);
         }
     }
 
@@ -108,7 +103,7 @@ public class ContractRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении договора id=" + contract.getId(), e);
         }
     }
 
@@ -122,7 +117,7 @@ public class ContractRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении договора id=" + id, e);
         }
     }
 

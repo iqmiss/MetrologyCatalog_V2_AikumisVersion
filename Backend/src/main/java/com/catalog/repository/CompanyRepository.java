@@ -20,18 +20,11 @@ public class CompanyRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Company company = new Company();
-                company.setId(rs.getInt("id"));
-                company.setBin(rs.getString("bin"));
-                company.setName(rs.getString("name"));
-                company.setAddress(rs.getString("address"));
-                company.setPhone(rs.getString("phone"));
-                company.setEmail(rs.getString("email"));
-                companies.add(company);
+                companies.add(mapResultSetToCompany(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех компаний", e);
         }
 
         return companies;
@@ -39,56 +32,40 @@ public class CompanyRepository {
 
     public Company findById(int id) {
         String sql = "SELECT * FROM companies WHERE id = ?";
-        Company company = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    company = new Company();
-                    company.setId(rs.getInt("id"));
-                    company.setBin(rs.getString("bin"));
-                    company.setName(rs.getString("name"));
-                    company.setAddress(rs.getString("address"));
-                    company.setPhone(rs.getString("phone"));
-                    company.setEmail(rs.getString("email"));
-                }
+                if (rs.next()) return mapResultSetToCompany(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении компании id=" + id, e);
         }
 
-        return company;
+        return null;
     }
 
+    // Поиск компании по БИН — используется при регистрации
+    // чтобы привязать нового пользователя к существующей компании
     public Company findByBin(String bin) {
         String sql = "SELECT * FROM companies WHERE bin = ?";
-        Company company = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, bin);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    company = new Company();
-                    company.setId(rs.getInt("id"));
-                    company.setBin(rs.getString("bin"));
-                    company.setName(rs.getString("name"));
-                    company.setAddress(rs.getString("address"));
-                    company.setPhone(rs.getString("phone"));
-                    company.setEmail(rs.getString("email"));
-                }
+                if (rs.next()) return mapResultSetToCompany(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при поиске компании по БИН=" + bin, e);
         }
 
-        return company;
+        return null;
     }
 
     public void save(Company company) {
@@ -105,7 +82,7 @@ public class CompanyRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении компании", e);
         }
     }
 
@@ -124,7 +101,7 @@ public class CompanyRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении компании id=" + company.getId(), e);
         }
     }
 
@@ -138,7 +115,18 @@ public class CompanyRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении компании id=" + id, e);
         }
+    }
+
+    private Company mapResultSetToCompany(ResultSet rs) throws SQLException {
+        Company company = new Company();
+        company.setId(rs.getInt("id"));
+        company.setBin(rs.getString("bin"));
+        company.setName(rs.getString("name"));
+        company.setAddress(rs.getString("address"));
+        company.setPhone(rs.getString("phone"));
+        company.setEmail(rs.getString("email"));
+        return company;
     }
 }

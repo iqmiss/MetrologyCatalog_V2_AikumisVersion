@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public class OrderRepository {
@@ -20,12 +21,11 @@ public class OrderRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Order order = mapResultSetToOrder(rs);
-                orders.add(order);
+                orders.add(mapResultSetToOrder(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех заказов", e);
         }
 
         return orders;
@@ -33,7 +33,6 @@ public class OrderRepository {
 
     public Order findById(int id) {
         String sql = "SELECT * FROM orders WHERE id = ?";
-        Order order = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -41,15 +40,15 @@ public class OrderRepository {
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    order = mapResultSetToOrder(rs);
+                    return mapResultSetToOrder(rs);
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении заказа id=" + id, e);
         }
 
-        return order;
+        return null;
     }
 
     public List<Order> findByClientId(int clientId) {
@@ -62,13 +61,12 @@ public class OrderRepository {
             stmt.setInt(1, clientId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Order order = mapResultSetToOrder(rs);
-                    orders.add(order);
+                    orders.add(mapResultSetToOrder(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении заказов клиента id=" + clientId, e);
         }
 
         return orders;
@@ -84,13 +82,12 @@ public class OrderRepository {
             stmt.setInt(1, labId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Order order = mapResultSetToOrder(rs);
-                    orders.add(order);
+                    orders.add(mapResultSetToOrder(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении заказов лаборатории id=" + labId, e);
         }
 
         return orders;
@@ -106,16 +103,49 @@ public class OrderRepository {
             stmt.setString(1, status);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Order order = mapResultSetToOrder(rs);
-                    orders.add(order);
+                    orders.add(mapResultSetToOrder(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при фильтрации заказов по статусу=" + status, e);
         }
 
         return orders;
+    }
+
+    public Map<String, Object> getStats() {
+        String sql = """
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                SUM(CASE WHEN status = 'in_work' THEN 1 ELSE 0 END) as in_work,
+                SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) as new_orders,
+                SUM(CASE WHEN status = 'awaiting_payment' THEN 1 ELSE 0 END) as awaiting_payment,
+                SUM(CASE WHEN status = 'completed' THEN total_price ELSE 0 END) as total_revenue
+            FROM orders
+            """;
+
+        try (Connection conn = DatabaseUtil.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            ResultSet rs = stmt.executeQuery()) {
+
+            if (rs.next()) {
+                Map<String, Object> stats = new java.util.HashMap<>();
+                stats.put("totalOrders", rs.getLong("total"));
+                stats.put("completedOrders", rs.getLong("completed"));
+                stats.put("inWorkOrders", rs.getLong("in_work"));
+                stats.put("newOrders", rs.getLong("new_orders"));
+                stats.put("awaitingPayment", rs.getLong("awaiting_payment"));
+                stats.put("totalRevenue", rs.getDouble("total_revenue"));
+                return stats;
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Ошибка при получении статистики заказов", e);
+        }
+
+        return new java.util.HashMap<>();
     }
 
     public void save(Order order) {
@@ -141,7 +171,7 @@ public class OrderRepository {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении заказа", e);
         }
     }
 
@@ -163,7 +193,7 @@ public class OrderRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении заказа id=" + order.getId(), e);
         }
     }
 
@@ -177,7 +207,7 @@ public class OrderRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении заказа id=" + id, e);
         }
     }
 

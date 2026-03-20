@@ -20,12 +20,11 @@ public class ResultRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Result result = mapResultSetToResult(rs);
-                results.add(result);
+                results.add(mapResultSetToResult(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех результатов", e);
         }
 
         return results;
@@ -33,46 +32,43 @@ public class ResultRepository {
 
     public Result findById(int id) {
         String sql = "SELECT * FROM results WHERE id = ?";
-        Result result = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    result = mapResultSetToResult(rs);
-                }
+                if (rs.next()) return mapResultSetToResult(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении результата id=" + id, e);
         }
 
-        return result;
+        return null;
     }
 
+    // Поиск результата по ID заявки — используется в PdfService для генерации сертификата
+    // Один заказ имеет один результат поверки
     public Result findByOrderId(int orderId) {
         String sql = "SELECT * FROM results WHERE order_id = ?";
-        Result result = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, orderId);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    result = mapResultSetToResult(rs);
-                }
+                if (rs.next()) return mapResultSetToResult(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении результата для заявки id=" + orderId, e);
         }
 
-        return result;
+        return null;
     }
 
+    // Получение всех результатов конкретного метролога — история его работ
     public List<Result> findByMetrologistId(int metrologistId) {
         List<Result> results = new ArrayList<>();
         String sql = "SELECT * FROM results WHERE metrologist_id = ?";
@@ -83,13 +79,12 @@ public class ResultRepository {
             stmt.setInt(1, metrologistId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Result result = mapResultSetToResult(rs);
-                    results.add(result);
+                    results.add(mapResultSetToResult(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении результатов метролога id=" + metrologistId, e);
         }
 
         return results;
@@ -111,7 +106,7 @@ public class ResultRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении результата поверки", e);
         }
     }
 
@@ -132,7 +127,7 @@ public class ResultRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении результата поверки id=" + result.getId(), e);
         }
     }
 
@@ -146,7 +141,7 @@ public class ResultRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении результата id=" + id, e);
         }
     }
 

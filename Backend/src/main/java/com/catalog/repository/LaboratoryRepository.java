@@ -20,18 +20,11 @@ public class LaboratoryRepository {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                Laboratory lab = new Laboratory();
-                lab.setId(rs.getInt("id"));
-                lab.setName(rs.getString("name"));
-                lab.setAddress(rs.getString("address"));
-                lab.setPhone(rs.getString("phone"));
-                lab.setCity(rs.getString("city"));
-                lab.setEmail(rs.getString("email"));
-                laboratories.add(lab);
+                laboratories.add(mapResultSetToLab(rs));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении всех лабораторий", e);
         }
 
         return laboratories;
@@ -39,31 +32,23 @@ public class LaboratoryRepository {
 
     public Laboratory findById(int id) {
         String sql = "SELECT * FROM laboratories WHERE id = ?";
-        Laboratory lab = null;
 
         try (Connection conn = DatabaseUtil.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setInt(1, id);
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    lab = new Laboratory();
-                    lab.setId(rs.getInt("id"));
-                    lab.setName(rs.getString("name"));
-                    lab.setAddress(rs.getString("address"));
-                    lab.setPhone(rs.getString("phone"));
-                    lab.setCity(rs.getString("city"));
-                    lab.setEmail(rs.getString("email"));
-                }
+                if (rs.next()) return mapResultSetToLab(rs);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при получении лаборатории id=" + id, e);
         }
 
-        return lab;
+        return null;
     }
 
+    // Поиск лабораторий по городу — для фильтрации в форме создания заявки
     public List<Laboratory> findByCity(String city) {
         List<Laboratory> laboratories = new ArrayList<>();
         String sql = "SELECT * FROM laboratories WHERE city = ?";
@@ -74,19 +59,12 @@ public class LaboratoryRepository {
             stmt.setString(1, city);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    Laboratory lab = new Laboratory();
-                    lab.setId(rs.getInt("id"));
-                    lab.setName(rs.getString("name"));
-                    lab.setAddress(rs.getString("address"));
-                    lab.setPhone(rs.getString("phone"));
-                    lab.setCity(rs.getString("city"));
-                    lab.setEmail(rs.getString("email"));
-                    laboratories.add(lab);
+                    laboratories.add(mapResultSetToLab(rs));
                 }
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при поиске лабораторий в городе=" + city, e);
         }
 
         return laboratories;
@@ -106,7 +84,7 @@ public class LaboratoryRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при сохранении лаборатории", e);
         }
     }
 
@@ -125,7 +103,7 @@ public class LaboratoryRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при обновлении лаборатории id=" + lab.getId(), e);
         }
     }
 
@@ -139,7 +117,18 @@ public class LaboratoryRepository {
             stmt.executeUpdate();
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Ошибка при удалении лаборатории id=" + id, e);
         }
+    }
+
+    private Laboratory mapResultSetToLab(ResultSet rs) throws SQLException {
+        Laboratory lab = new Laboratory();
+        lab.setId(rs.getInt("id"));
+        lab.setName(rs.getString("name"));
+        lab.setAddress(rs.getString("address"));
+        lab.setPhone(rs.getString("phone"));
+        lab.setCity(rs.getString("city"));
+        lab.setEmail(rs.getString("email"));
+        return lab;
     }
 }
