@@ -11,7 +11,7 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-// Добавляем token в каждый запрос
+// Добавляем JWT токен в каждый запрос через заголовок Authorization
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -25,7 +25,7 @@ api.interceptors.request.use(
   }
 );
 
-// Обработка ошибок (если token истёк)
+// Если токен истёк (401) — очищаем хранилище и перенаправляем на логин
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -65,18 +65,17 @@ export const orderApi = {
   updateStatus: (id: number, status: string) => api.put(`/orders/${id}/status`, { status }),
 };
 
-// Contract endpoints
+// Contract endpoints — исправлены маршруты
 export const contractApi = {
   getByOrderId: (orderId: number) => api.get(`/contracts/${orderId}`),
-  sign: (orderId: number) => api.put(`/contracts/${orderId}/sign`, { isSigned: true }),
-  download: (contractId: number) => api.get(`/contracts/${contractId}/download`, { responseType: 'blob' }),
+  sign: (orderId: number, userId: number) => api.put(`/contracts/${orderId}/sign`, { userId }),
+  download: (orderId: number) => api.get(`/contracts/${orderId}/download`, { responseType: 'blob' }),
 };
 
 // Result endpoints
 export const resultApi = {
-  getByOrderId: (orderId: number) => api.get(`/results/${orderId}`),
-  create: (orderId: number, data: any) => api.post(`/results/${orderId}`, data),
-  download: (resultId: number) => api.get(`/results/${resultId}/download`, { responseType: 'blob' }),
+  getByOrderId: (orderId: number) => api.get(`/results/order/${orderId}`),
+  create: (data: any) => api.post('/results', data),
 };
 
 // Notification endpoints

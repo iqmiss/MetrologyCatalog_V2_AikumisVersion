@@ -198,7 +198,7 @@ public class OrderController {
             // Валидация — проверяем что переданный статус допустимый
             List<String> validStatuses = List.of(
                 "new", "awaiting_payment", "awaiting_delivery",
-                "received_in_lab", "in_work", "under_review", "completed"
+                "received_in_lab", "in_work", "under_review", "completed", "cancelled"
             );
             if (request.getStatus() == null || !validStatuses.contains(request.getStatus())) {
                 return ResponseEntity.status(400).body(errorResponse("Недопустимый статус: " + request.getStatus()));

@@ -30,6 +30,12 @@ public class User {
     @Column(name = "is_active")
     private boolean isActive;
 
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_expires")
+    private java.time.LocalDateTime passwordResetExpires;
+
     public User() {}
 
     public User(String email, String passwordHash, String role, String fullName) {
@@ -63,4 +69,10 @@ public class User {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
+
+    public String getPasswordResetToken() { return passwordResetToken; }
+    public void setPasswordResetToken(String passwordResetToken) { this.passwordResetToken = passwordResetToken; }
+
+    public java.time.LocalDateTime getPasswordResetExpires() { return passwordResetExpires; }
+    public void setPasswordResetExpires(java.time.LocalDateTime passwordResetExpires) { this.passwordResetExpires = passwordResetExpires; }
 }

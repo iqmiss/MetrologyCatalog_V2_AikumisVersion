@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import api, { orderApi } from '../services/api';
 import type { Order } from '../types';
+import { downloadCertificate, downloadContract } from '../utils/download';
 
 // Страница очереди заявок для ролей metrolog и manager
 // Показывает все заявки в системе и позволяет управлять их статусами
@@ -27,10 +28,11 @@ export default function Queue() {
     in_work: 'В работе',
     under_review: 'На проверке',
     completed: 'Завершено',
+    cancelled: 'Отменено',
   };
 
   // Определяет следующий статус для каждого текущего
-  // awaiting_payment → awaiting_payment т.к. клиент оплачивает сам
+  // awaiting_payment -> awaiting_payment и cancelled -> cancelled т.к. клиент оплачивает сам и отменяет заказ сам
   const statusFlow: Record<string, string> = {
     new: 'awaiting_payment',
     awaiting_payment: 'awaiting_payment',
@@ -39,6 +41,7 @@ export default function Queue() {
     in_work: 'under_review',
     under_review: 'completed',
     completed: 'completed',
+    cancelled: 'cancelled',
   };
 
   // Цвета бейджей для каждого статуса
@@ -69,7 +72,7 @@ export default function Queue() {
     }
   };
 
-  // Обрабатывает нажатие кнопки "Далее →"
+  // Обрабатывает нажатие кнопки "Далее ->"
   // Если следующий статус — completed, показываем модалку для заполнения результата
   const handleStatusChange = async (orderId: number, currentStatus: string) => {
     const nextStatus = statusFlow[currentStatus];
@@ -129,53 +132,6 @@ export default function Queue() {
       setError('Ошибка при завершении заявки');
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  // Скачивает PDF сертификат/протокол/отчёт для завершённой заявки
-  const handleDownloadPdf = async (orderId: number, orderNumber: string) => {
-    try {
-      setDownloadingId(orderId);
-      const response = await fetch(`http://localhost:8080/api/pdf/certificate/${orderId}`, {
-        method: 'GET',
-      });
-
-      if (!response.ok) throw new Error('Ошибка загрузки PDF');
-
-      // Создаём временную ссылку для скачивания файла
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `certificate_${orderNumber}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Не удалось скачать PDF');
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  // Скачивает PDF договора для заявки
-  // Если договор ещё не создан — создаёт его автоматически
-  const handleDownloadContract = async (orderId: number, orderNumber: string) => {
-    try {
-      // POST создаст договор если его нет, или вернёт существующий
-      await api.post(`/contracts/${orderId}`);
-
-      const response = await fetch(`http://localhost:8080/api/contracts/${orderId}/download`);
-      if (!response.ok) throw new Error('Ошибка загрузки');
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contract_${orderNumber}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Ошибка при загрузке договора');
     }
   };
 
@@ -242,7 +198,7 @@ export default function Queue() {
                   <button
                     className="btn-pdf"
                     style={{ background: '#1d4ed8', marginLeft: '8px' }}
-                    onClick={() => handleDownloadContract(order.id, order.orderNumber)}
+                    onClick={() => downloadContract(order.id, order.orderNumber, api, setError)}
                   >
                     📝 Договор
                   </button>
@@ -252,7 +208,7 @@ export default function Queue() {
                 {order.status === 'completed' && (
                   <button
                     className="btn-pdf"
-                    onClick={() => handleDownloadPdf(order.id, order.orderNumber)}
+                    onClick={() => downloadCertificate(order.id, order.orderNumber, setError, setDownloadingId)}
                     disabled={downloadingId === order.id}
                   >
                     {downloadingId === order.id ? 'Загрузка...' : '📄 Сертификат'}

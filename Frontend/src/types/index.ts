@@ -45,7 +45,7 @@ export interface Order {
   clientId: number;
   serviceId: number;
   labId: number;
-  status: 'new' | 'awaiting_payment' | 'awaiting_delivery' | 'received_in_lab' | 'in_work' | 'under_review' | 'completed';
+  status: 'new' | 'awaiting_payment' | 'awaiting_delivery' | 'received_in_lab' | 'in_work' | 'under_review' | 'completed' | 'cancelled';
   totalPrice: number;
   dueDate?: string;
   metrologistId?: number;

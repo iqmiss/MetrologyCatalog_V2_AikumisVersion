@@ -22,7 +22,7 @@ public class Order {
     @Column(name = "lab_id", nullable = false)
     private int labId;
 
-    @Column(columnDefinition = "ENUM('new','awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed')")
+    @Column(columnDefinition = "ENUM('new','awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed', 'cancelled')")
     private String status;
 
     @Column(name = "total_price", nullable = false, columnDefinition = "DECIMAL(10,2)")
