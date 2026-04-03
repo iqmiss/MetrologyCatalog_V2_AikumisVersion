@@ -26,18 +26,15 @@ export default function AdminUsers() {
     admin: 'Администратор',
   };
 
-  // Цвета для визуального выделения каждой роли
-  const roleColors: Record<string, string> = {
-    client: '#3b82f6',
-    metrolog: '#8b5cf6',
-    manager: '#f97316',
-    admin: '#dc2626',
+  // Цвета бейджей для каждой роли
+  const roleColors: Record<string, { bg: string; text: string }> = {
+    client: { bg: 'bg-blue-100', text: 'text-blue-700' },
+    metrolog: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    manager: { bg: 'bg-orange-100', text: 'text-orange-700' },
+    admin: { bg: 'bg-red-100', text: 'text-red-700' },
   };
 
-  // Загружаем всех пользователей при монтировании компонента
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  useEffect(() => { fetchUsers(); }, []);
 
   const fetchUsers = async () => {
     try {
@@ -45,7 +42,7 @@ export default function AdminUsers() {
       // GET /api/users — доступен только администратору
       const response = await api.get('/users');
       setUsers(response.data);
-    } catch (err) {
+    } catch {
       setError('Ошибка при загрузке пользователей');
     } finally {
       setIsLoading(false);
@@ -57,126 +54,114 @@ export default function AdminUsers() {
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
       await api.put(`/users/${userId}/role`, { role: newRole });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-      );
-    } catch (err) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch {
       setError('Ошибка при смене роли');
     }
   };
 
   // Переключает статус активности пользователя (блокировка/разблокировка)
-  // Заблокированный пользователь не может войти в систему
   const handleToggleActive = async (userId: number, isActive: boolean) => {
     try {
       // Передаём инвертированное значение — меняем на противоположное
       await api.put(`/users/${userId}/active`, { active: !isActive });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, active: !isActive } : u))
-      );
-    } catch (err) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, active: !isActive } : u));
+    } catch {
       setError('Ошибка при изменении статуса пользователя');
     }
   };
 
-  if (isLoading) return <div className="loading">Загрузка...</div>;
-  if (error) return <div className="error-message">{error}</div>;
+  if (isLoading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center gap-3 text-gray-400">
+        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        Загрузка...
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ color: '#fff', marginBottom: '20px' }}>👥 Управление пользователями</h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-6xl mx-auto">
 
-      <div style={{ color: '#b0b0b0', marginBottom: '20px', fontSize: '14px' }}>
-        Всего пользователей: <strong style={{ color: '#fff' }}>{users.length}</strong>
-      </div>
+        {/* Заголовок */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-[#0A2E5C]" style={{ margin: 0, fontSize: '1.75rem' }}>
+            Управление пользователями
+          </h1>
+          <p className="text-gray-500 text-sm mt-1" style={{ margin: '4px 0 0' }}>
+            Всего пользователей: <span className="font-semibold text-[#0A2E5C]">{users.length}</span>
+          </p>
+        </div>
 
-      {/* Таблица пользователей */}
-      <div style={{
-        background: '#1a1a1a',
-        border: '1px solid #333',
-        borderRadius: '8px',
-        overflow: 'hidden'
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#252525', borderBottom: '1px solid #333' }}>
-              {['ID', 'ФИО', 'Email', 'Телефон', 'Роль', 'Статус', 'Действия'].map((h) => (
-                <th key={h} style={{
-                  padding: '12px 16px',
-                  textAlign: 'left',
-                  color: '#0ea5e9',
-                  fontSize: '13px',
-                  fontWeight: 600
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user, i) => (
-              // Заблокированные пользователи отображаются полупрозрачными
-              <tr key={user.id} style={{
-                borderBottom: '1px solid #2a2a2a',
-                background: i % 2 === 0 ? '#1a1a1a' : '#1e1e1e',
-                opacity: user.active ? 1 : 0.5
-              }}>
-                <td style={{ padding: '12px 16px', color: '#666' }}>{user.id}</td>
-                <td style={{ padding: '12px 16px', color: '#fff' }}>{user.fullName || '—'}</td>
-                <td style={{ padding: '12px 16px', color: '#b0b0b0' }}>{user.email}</td>
-                <td style={{ padding: '12px 16px', color: '#b0b0b0' }}>{user.phone || '—'}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  {/* Выпадающий список для смены роли — цвет рамки соответствует роли */}
-                  <select
-                    value={user.role}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                    style={{
-                      background: '#2a2a2a',
-                      border: `1px solid ${roleColors[user.role]}`,
-                      borderRadius: '6px',
-                      color: roleColors[user.role],
-                      padding: '4px 8px',
-                      fontSize: '13px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {Object.entries(roleLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  {/* Бейдж статуса активности */}
-                  <span style={{
-                    background: user.active ? '#10b981' : '#dc2626',
-                    color: '#fff',
-                    padding: '3px 10px',
-                    borderRadius: '12px',
-                    fontSize: '12px'
-                  }}>
-                    {user.active ? 'Активен' : 'Заблокирован'}
-                  </span>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  {/* Кнопка блокировки/активации — цвет меняется в зависимости от статуса */}
-                  <button
-                    onClick={() => handleToggleActive(user.id, user.active)}
-                    style={{
-                      padding: '6px 12px',
-                      background: user.active ? '#7f1d1d' : '#14532d',
-                      border: 'none',
-                      borderRadius: '6px',
-                      color: '#fff',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                      marginBottom: 0
-                    }}
-                  >
-                    {user.active ? 'Заблокировать' : 'Активировать'}
-                  </button>
-                </td>
-              </tr>
+        {error && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-red-600 text-sm">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+            </svg>
+            {error}
+          </div>
+        )}
+
+        {/* Таблица пользователей */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="hidden lg:grid grid-cols-[60px_1fr_1fr_120px_140px_120px_140px] gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100">
+            {['ID', 'ФИО', 'Email', 'Телефон', 'Роль', 'Статус', 'Действия'].map(col => (
+              <div key={col} className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider">{col}</div>
             ))}
-          </tbody>
-        </table>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {users.map(user => {
+              const rc = roleColors[user.role] || { bg: 'bg-gray-100', text: 'text-gray-600' };
+              return (
+                // Заблокированные пользователи отображаются полупрозрачными
+                <div key={user.id}
+                  className={`grid grid-cols-1 lg:grid-cols-[60px_1fr_1fr_120px_140px_120px_140px] gap-4 px-6 py-4 hover:bg-gray-50/50 transition-colors items-center ${!user.active ? 'opacity-50' : ''}`}>
+
+                  <div className="text-xs text-gray-400 font-mono">#{user.id}</div>
+                  <div className="font-medium text-[#0A2E5C] text-sm">{user.fullName || '—'}</div>
+                  <div className="text-sm text-gray-500 truncate">{user.email}</div>
+                  <div className="text-sm text-gray-500">{user.phone || '—'}</div>
+
+                  {/* Выпадающий список для смены роли */}
+                  <div>
+                    <select
+                      value={user.role}
+                      onChange={e => handleRoleChange(user.id, e.target.value)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-none outline-none cursor-pointer ${rc.bg} ${rc.text}`}
+                      style={{ fontFamily: 'inherit', marginBottom: 0 }}
+                    >
+                      {Object.entries(roleLabels).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Бейдж статуса активности */}
+                  <div>
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${user.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {user.active ? 'Активен' : 'Заблокирован'}
+                    </span>
+                  </div>
+
+                  {/* Кнопка блокировки/активации */}
+                  <div>
+                    <button
+                      onClick={() => handleToggleActive(user.id, user.active)}
+                      className={`px-3 py-1.5 text-white font-medium rounded-lg border-none cursor-pointer text-xs transition-colors ${user.active ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'}`}
+                      style={{ marginBottom: 0 }}
+                    >
+                      {user.active ? 'Заблокировать' : 'Активировать'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

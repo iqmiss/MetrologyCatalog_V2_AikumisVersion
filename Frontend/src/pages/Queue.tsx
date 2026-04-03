@@ -10,7 +10,7 @@ export default function Queue() {
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   // Состояние модалки для завершения заявки
@@ -32,7 +32,6 @@ export default function Queue() {
   };
 
   // Определяет следующий статус для каждого текущего
-  // awaiting_payment -> awaiting_payment и cancelled -> cancelled т.к. клиент оплачивает сам и отменяет заказ сам
   const statusFlow: Record<string, string> = {
     new: 'awaiting_payment',
     awaiting_payment: 'awaiting_payment',
@@ -45,14 +44,15 @@ export default function Queue() {
   };
 
   // Цвета бейджей для каждого статуса
-  const statusColors: Record<string, string> = {
-    new: '#3b82f6',
-    awaiting_payment: '#eab308',
-    awaiting_delivery: '#f59e0b',
-    received_in_lab: '#8b5cf6',
-    in_work: '#ec4899',
-    under_review: '#f97316',
-    completed: '#10b981',
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    new: { bg: 'bg-blue-100', text: 'text-blue-700' },
+    awaiting_payment: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+    awaiting_delivery: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    received_in_lab: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    in_work: { bg: 'bg-pink-100', text: 'text-pink-700' },
+    under_review: { bg: 'bg-orange-100', text: 'text-orange-700' },
+    completed: { bg: 'bg-green-100', text: 'text-green-700' },
+    cancelled: { bg: 'bg-gray-100', text: 'text-gray-500' },
   };
 
   // Загружаем все заявки при монтировании компонента
@@ -65,14 +65,14 @@ export default function Queue() {
       setIsLoading(true);
       const response = await orderApi.getAll();
       setOrders(response.data);
-    } catch (err) {
+    } catch {
       setError('Ошибка при загрузке заявок');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Обрабатывает нажатие кнопки "Далее ->"
+  // Обрабатывает нажатие кнопки "Далее →"
   // Если следующий статус — completed, показываем модалку для заполнения результата
   const handleStatusChange = async (orderId: number, currentStatus: string) => {
     const nextStatus = statusFlow[currentStatus];
@@ -87,162 +87,203 @@ export default function Queue() {
     try {
       await orderApi.updateStatus(orderId, nextStatus);
       // Обновляем статус локально без перезагрузки страницы
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: nextStatus as Order['status'] } : order
-        )
+      setOrders(prev =>
+        prev.map(o => o.id === orderId ? { ...o, status: nextStatus as Order['status'] } : o)
       );
-    } catch (err) {
+    } catch {
       setError('Ошибка при изменении статуса');
     }
   };
 
   // Завершает заявку: создаёт результат поверки и меняет статус на completed
-  // Вызывается из модалки при нажатии "✅ Завершить"
   const handleCompleteWithResult = async () => {
     if (!selectedOrderId || !user) return;
-
     try {
       setSubmitting(true);
 
       // Создаём запись о результате поверки в таблице results
       await api.post('/results', {
         orderId: selectedOrderId,
-        resultType,         // Тип: certificate, protocol, report
-        metrologistId: user.id, // ID текущего метролога
+        resultType,
+        metrologistId: user.id,
       });
 
       // Меняем статус заявки на completed (отправит email клиенту)
       await orderApi.updateStatus(selectedOrderId, 'completed');
 
       // Обновляем статус локально без перезагрузки
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === selectedOrderId
-            ? { ...order, status: 'completed' as Order['status'] }
-            : order
-        )
+      setOrders(prev =>
+        prev.map(o => o.id === selectedOrderId ? { ...o, status: 'completed' as Order['status'] } : o)
       );
 
       // Сбрасываем состояние модалки
       setShowModal(false);
       setSelectedOrderId(null);
       setResultType('certificate');
-    } catch (err) {
+    } catch {
       setError('Ошибка при завершении заявки');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const getStatusClass = (status: string) =>
+    statusColors[status] || { bg: 'bg-gray-100', text: 'text-gray-500' };
+
   if (isLoading) {
     return (
-      <div className="queue-container">
-        <div className="loading">Загрузка очереди...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-400">
+          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
+          Загрузка очереди...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="queue-container">
-      <h1>Очередь заявок</h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-6xl mx-auto">
 
-      {error && <div className="error-message">{error}</div>}
-
-      {orders.length === 0 ? (
-        <div className="no-orders">Нет заявок в системе</div>
-      ) : (
-        <div className="queue-table">
-          {/* Заголовок таблицы */}
-          <div className="table-header">
-            <div className="col col-number">№ Заявки</div>
-            <div className="col col-client">Клиент ID</div>
-            <div className="col col-status">Статус</div>
-            <div className="col col-price">Стоимость</div>
-            <div className="col col-action">Действие</div>
-          </div>
-
-          {orders.map((order) => (
-            <div key={order.id} className="table-row">
-              <div className="col col-number">
-                <strong>#{order.orderNumber}</strong>
-              </div>
-              <div className="col col-client">{order.clientId}</div>
-              <div className="col col-status">
-                <span
-                  className="status-badge"
-                  style={{ backgroundColor: statusColors[order.status] }}
-                >
-                  {statusLabels[order.status] || order.status}
-                </span>
-              </div>
-              <div className="col col-price">{order.totalPrice.toLocaleString()} ₸</div>
-              <div className="col col-action">
-                {/* Кнопка "Далее →" — скрыта для completed и awaiting_payment */}
-                {order.status !== 'completed' && order.status !== 'awaiting_payment' && (
-                  <button
-                    className="btn-next-status"
-                    onClick={() => handleStatusChange(order.id, order.status)}
-                  >
-                    Далее →
-                  </button>
-                )}
-
-                {/* Для awaiting_payment показываем текст вместо кнопки */}
-                {order.status === 'awaiting_payment' && (
-                  <span style={{ color: '#eab308', fontSize: '13px' }}>Ожидает оплаты</span>
-                )}
-
-                {/* Кнопка договора — доступна для всех статусов кроме new */}
-                {order.status !== 'new' && (
-                  <button
-                    className="btn-pdf"
-                    style={{ background: '#1d4ed8', marginLeft: '8px' }}
-                    onClick={() => downloadContract(order.id, order.orderNumber, api, setError)}
-                  >
-                    📝 Договор
-                  </button>
-                )}
-
-                {/* Кнопка сертификата — только для завершённых заявок */}
-                {order.status === 'completed' && (
-                  <button
-                    className="btn-pdf"
-                    onClick={() => downloadCertificate(order.id, order.orderNumber, setError, setDownloadingId)}
-                    disabled={downloadingId === order.id}
-                  >
-                    {downloadingId === order.id ? 'Загрузка...' : '📄 Сертификат'}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+        {/* Заголовок */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-[#0A2E5C]" style={{ margin: 0, fontSize: '1.75rem' }}>
+            Очередь заявок
+          </h1>
+          <p className="text-gray-500 text-sm mt-1" style={{ margin: '4px 0 0' }}>
+            Управление заявками в системе
+          </p>
         </div>
-      )}
+
+        {error && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-red-600 text-sm">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+            </svg>
+            {error}
+          </div>
+        )}
+
+        {orders.length === 0 ? (
+          <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
+            <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
+            </svg>
+            <p className="text-gray-400">Нет заявок в системе</p>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            {/* Заголовок таблицы */}
+            <div className="hidden md:grid grid-cols-[1fr_100px_160px_130px_220px] gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100">
+              {['№ Заявки', 'Клиент', 'Статус', 'Стоимость', 'Действия'].map(col => (
+                <div key={col} className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider">{col}</div>
+              ))}
+            </div>
+
+            {/* Строки таблицы */}
+            <div className="divide-y divide-gray-50">
+              {orders.map(order => {
+                const sc = getStatusClass(order.status);
+                return (
+                  <div key={order.id}
+                    className="grid grid-cols-1 md:grid-cols-[1fr_100px_160px_130px_220px] gap-4 px-6 py-4 hover:bg-gray-50/50 transition-colors items-center">
+
+                    {/* № заявки */}
+                    <div className="font-bold text-[#0A2E5C]">#{order.orderNumber}</div>
+
+                    {/* Клиент */}
+                    <div className="text-sm text-gray-500">ID: {order.clientId}</div>
+
+                    {/* Статус */}
+                    <div>
+                      <span className={`text-xs font-semibold px-3 py-1 rounded-full ${sc.bg} ${sc.text}`}>
+                        {statusLabels[order.status] || order.status}
+                      </span>
+                    </div>
+
+                    {/* Стоимость */}
+                    <div className="text-sm font-semibold text-[#0A2E5C]">
+                      {order.totalPrice.toLocaleString()} ₸
+                    </div>
+
+                    {/* Действия */}
+                    <div className="flex flex-wrap gap-2">
+                      {/* Кнопка "Далее →" — скрыта для completed и awaiting_payment */}
+                      {order.status !== 'completed' && order.status !== 'awaiting_payment' && order.status !== 'cancelled' && (
+                        <button
+                          onClick={() => handleStatusChange(order.id, order.status)}
+                          className="px-3 py-1.5 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-medium rounded-lg border-none cursor-pointer text-xs transition-colors flex items-center gap-1"
+                          style={{ marginBottom: 0 }}
+                        >
+                          Далее
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                            <path d="m9 18 6-6-6-6"/>
+                          </svg>
+                        </button>
+                      )}
+
+                      {/* Для awaiting_payment показываем текст вместо кнопки */}
+                      {order.status === 'awaiting_payment' && (
+                        <span className="text-xs text-yellow-600 font-medium px-2 py-1.5">Ожидает оплаты</span>
+                      )}
+
+                      {/* Кнопка договора — доступна для всех статусов кроме new */}
+                      {order.status !== 'new' && (
+                        <button
+                          onClick={() => downloadContract(order.id, order.orderNumber, api, setError)}
+                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg border-none cursor-pointer text-xs transition-colors flex items-center gap-1"
+                          style={{ marginBottom: 0 }}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                          </svg>
+                          Договор
+                        </button>
+                      )}
+
+                      {/* Кнопка сертификата — только для завершённых заявок */}
+                      {order.status === 'completed' && (
+                        <button
+                          onClick={() => downloadCertificate(order.id, order.orderNumber, setError, setDownloadingId)}
+                          disabled={downloadingId === order.id}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg border-none cursor-pointer text-xs transition-colors flex items-center gap-1"
+                          style={{ marginBottom: 0 }}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                          {downloadingId === order.id ? 'Загрузка...' : 'Сертификат'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Модалка для завершения заявки — метролог выбирает тип документа */}
       {showModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.7)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            background: '#1a1a1a', border: '1px solid #333',
-            borderRadius: '8px', padding: '30px', width: '400px'
-          }}>
-            <h2 style={{ color: '#fff', marginBottom: '20px' }}>Завершить заявку</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <h2 className="font-bold text-[#0A2E5C] mb-6" style={{ margin: '0 0 24px', fontSize: '1.25rem' }}>
+              Завершить заявку
+            </h2>
 
-            <div className="form-group">
-              <label style={{ color: '#b0b0b0', display: 'block', marginBottom: '8px' }}>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Тип документа
               </label>
               {/* Выбор типа результата: сертификат, протокол или отчёт */}
               <select
                 value={resultType}
-                onChange={(e) => setResultType(e.target.value)}
-                className="filter-select"
-                style={{ width: '100%' }}
+                onChange={e => setResultType(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all cursor-pointer"
+                style={{ fontFamily: 'inherit', marginBottom: 0 }}
               >
                 <option value="certificate">Сертификат</option>
                 <option value="protocol">Протокол</option>
@@ -250,17 +291,22 @@ export default function Queue() {
               </select>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+            <div className="flex gap-3">
               <button
                 onClick={handleCompleteWithResult}
                 disabled={submitting}
-                style={{ flex: 1, marginBottom: 0, background: '#10b981' }}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors flex items-center justify-center gap-2"
+                style={{ marginBottom: 0 }}
               >
-                {submitting ? 'Сохранение...' : '✅ Завершить'}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path d="m9 11 3 3L22 4"/>
+                </svg>
+                {submitting ? 'Сохранение...' : 'Завершить'}
               </button>
               <button
                 onClick={() => { setShowModal(false); setSelectedOrderId(null); }}
-                style={{ flex: 1, marginBottom: 0, background: '#333' }}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors"
+                style={{ marginBottom: 0 }}
               >
                 Отмена
               </button>

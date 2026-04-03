@@ -22,27 +22,24 @@ export default function Reports() {
   };
 
   // Цвета бейджей для каждого статуса
-  const statusColors: Record<string, string> = {
-    new: '#3b82f6',
-    awaiting_payment: '#eab308',
-    awaiting_delivery: '#f59e0b',
-    received_in_lab: '#8b5cf6',
-    in_work: '#ec4899',
-    under_review: '#f97316',
-    completed: '#10b981',
+  const statusColors: Record<string, { bg: string; text: string }> = {
+    new: { bg: 'bg-blue-100', text: 'text-blue-700' },
+    awaiting_payment: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+    awaiting_delivery: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    received_in_lab: { bg: 'bg-purple-100', text: 'text-purple-700' },
+    in_work: { bg: 'bg-pink-100', text: 'text-pink-700' },
+    under_review: { bg: 'bg-orange-100', text: 'text-orange-700' },
+    completed: { bg: 'bg-green-100', text: 'text-green-700' },
   };
 
-  // Загружаем все заявки при монтировании компонента
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useEffect(() => { fetchOrders(); }, []);
 
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
       const response = await orderApi.getAll();
       setOrders(response.data);
-    } catch (err) {
+    } catch {
       setError('Ошибка при загрузке отчёта');
     } finally {
       setIsLoading(false);
@@ -50,117 +47,112 @@ export default function Reports() {
   };
 
   // Фильтруем заявки по выбранному статусу
-  // Если фильтр не выбран — показываем все заявки
-  const filteredOrders = filterStatus
-    ? orders.filter((o) => o.status === filterStatus)
-    : orders;
+  const filteredOrders = filterStatus ? orders.filter(o => o.status === filterStatus) : orders;
 
   // Считаем выручку только по завершённым заявкам из отфильтрованного списка
   const totalRevenue = filteredOrders
-    .filter((o) => o.status === 'completed')
+    .filter(o => o.status === 'completed')
     .reduce((sum, o) => sum + o.totalPrice, 0);
 
   // Форматируем дату в читаемый вид для русской локали
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleDateString('ru-RU');
-  };
+  const formatDate = (dateString?: string) =>
+    dateString ? new Date(dateString).toLocaleDateString('ru-RU') : '—';
 
-  if (isLoading) return <div className="loading">Загрузка...</div>;
-  if (error) return <div className="error-message">{error}</div>;
+  const getStatusClass = (status: string) =>
+    statusColors[status] || { bg: 'bg-gray-100', text: 'text-gray-500' };
+
+  if (isLoading) return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex items-center gap-3 text-gray-400">
+        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+        Загрузка...
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ color: '#fff', marginBottom: '20px' }}>📈 Отчёты</h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-6xl mx-auto">
 
-      {/* Панель фильтров и статистики */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', alignItems: 'center' }}>
-        {/* Фильтр по статусу */}
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="filter-select"
-          style={{ maxWidth: '220px' }}
-        >
-          <option value="">Все статусы</option>
-          {Object.entries(statusLabels).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+        {/* Заголовок */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-[#0A2E5C]" style={{ margin: 0, fontSize: '1.75rem' }}>
+            Отчёты
+          </h1>
+          <p className="text-gray-500 text-sm mt-1" style={{ margin: '4px 0 0' }}>
+            Все заявки в системе с фильтрацией и статистикой выручки
+          </p>
+        </div>
 
-        {/* Счётчик найденных заявок */}
-        <span style={{ color: '#b0b0b0', fontSize: '14px' }}>
-          Найдено: <strong style={{ color: '#fff' }}>{filteredOrders.length}</strong> заявок
-        </span>
+        {error && (
+          <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-red-600 text-sm">
+            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+            </svg>
+            {error}
+          </div>
+        )}
 
-        {/* Выручка показывается только при фильтре "Все" или "Завершено" */}
-        {filterStatus === 'completed' || filterStatus === '' ? (
-          <span style={{ color: '#b0b0b0', fontSize: '14px' }}>
-            Выручка: <strong style={{ color: '#10b981' }}>{totalRevenue.toLocaleString()} ₸</strong>
-          </span>
-        ) : null}
-      </div>
+        {/* Панель фильтров и статистики */}
+        <div className="flex flex-wrap items-center gap-4 mb-6">
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all cursor-pointer"
+            style={{ fontFamily: 'inherit', marginBottom: 0 }}
+          >
+            <option value="">Все статусы</option>
+            {Object.entries(statusLabels).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
 
-      {/* Таблица заявок */}
-      <div style={{
-        background: '#1a1a1a',
-        border: '1px solid #333',
-        borderRadius: '8px',
-        overflow: 'hidden'
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#252525', borderBottom: '1px solid #333' }}>
-              {['№ Заявки', 'Клиент ID', 'Статус', 'Стоимость', 'Срок'].map((h) => (
-                <th key={h} style={{
-                  padding: '12px 16px',
-                  textAlign: 'left',
-                  color: '#0ea5e9',
-                  fontSize: '13px',
-                  fontWeight: 600
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+          <div className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-100 rounded-xl shadow-sm text-sm">
+            <span className="text-gray-400">Найдено:</span>
+            <span className="font-bold text-[#0A2E5C]">{filteredOrders.length}</span>
+          </div>
+
+          {(filterStatus === 'completed' || filterStatus === '') && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-100 rounded-xl shadow-sm text-sm">
+              <span className="text-gray-400">Выручка:</span>
+              <span className="font-bold text-green-600">{totalRevenue.toLocaleString()} ₸</span>
+            </div>
+          )}
+        </div>
+
+        {/* Таблица заявок */}
+        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+          <div className="hidden md:grid grid-cols-5 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100">
+            {['№ Заявки', 'Клиент ID', 'Статус', 'Стоимость', 'Срок'].map(col => (
+              <div key={col} className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider">{col}</div>
+            ))}
+          </div>
+
+          <div className="divide-y divide-gray-50">
             {filteredOrders.length === 0 ? (
-              <tr>
-                <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-                  Нет заявок
-                </td>
-              </tr>
+              <div className="py-16 text-center text-gray-400">Нет заявок</div>
             ) : (
-              filteredOrders.map((order, i) => (
-                // Чередуем цвет строк для лучшей читаемости
-                <tr key={order.id} style={{
-                  borderBottom: '1px solid #2a2a2a',
-                  background: i % 2 === 0 ? '#1a1a1a' : '#1e1e1e'
-                }}>
-                  <td style={{ padding: '12px 16px', color: '#fff' }}>#{order.orderNumber}</td>
-                  <td style={{ padding: '12px 16px', color: '#b0b0b0' }}>{order.clientId}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    {/* Цветной бейдж статуса */}
-                    <span style={{
-                      background: statusColors[order.status],
-                      color: '#fff',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      fontSize: '12px'
-                    }}>
-                      {statusLabels[order.status] || order.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', color: '#0ea5e9' }}>
-                    {order.totalPrice.toLocaleString()} ₸
-                  </td>
-                  <td style={{ padding: '12px 16px', color: '#b0b0b0' }}>
-                    {formatDate(order.dueDate)}
-                  </td>
-                </tr>
-              ))
+              filteredOrders.map(order => {
+                const sc = getStatusClass(order.status);
+                return (
+                  <div key={order.id} className="grid grid-cols-1 md:grid-cols-5 gap-4 px-6 py-4 hover:bg-gray-50/50 transition-colors items-center">
+                    <div className="font-bold text-[#0A2E5C]">#{order.orderNumber}</div>
+                    <div className="text-sm text-gray-500">ID: {order.clientId}</div>
+                    <div>
+                      <span className={`text-xs font-semibold px-3 py-1 rounded-full ${sc.bg} ${sc.text}`}>
+                        {statusLabels[order.status] || order.status}
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold text-[#0A2E5C]">{order.totalPrice.toLocaleString()} ₸</div>
+                    <div className="text-sm text-gray-500">{formatDate(order.dueDate)}</div>
+                  </div>
+                );
+              })
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
     </div>
   );

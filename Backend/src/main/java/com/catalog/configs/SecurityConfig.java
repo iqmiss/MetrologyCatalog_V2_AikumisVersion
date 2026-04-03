@@ -45,6 +45,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/register").permitAll()
                 .requestMatchers("/api/auth/forgot-password").permitAll()
                 .requestMatchers("/api/auth/reset-password").permitAll()
+                .requestMatchers("/api/services").permitAll()
+                .requestMatchers("/api/services/**").permitAll()
 
                 // Все остальные endpoints требуют авторизации
                 .anyRequest().authenticated()
