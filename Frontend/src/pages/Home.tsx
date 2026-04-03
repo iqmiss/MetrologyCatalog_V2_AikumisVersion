@@ -19,7 +19,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   const [query, setQuery] = useState('');
-  const [services, setServices] = useState<Service[]>([]);
+  const [_services, setServices] = useState<Service[]>([]);
   const [results, setResults] = useState<Service[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const fuseRef = useRef<Fuse<Service> | null>(null);
@@ -68,7 +68,7 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSelect = (service: Service) => {
+  const handleSelect = (_service: Service) => {
     setShowDropdown(false);
     setQuery('');
     navigate('/login'); // неавторизованный — на логин
