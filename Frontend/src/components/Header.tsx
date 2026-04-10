@@ -143,7 +143,7 @@ export default function Header() {
                 </svg>
                 Новая заявка
               </button>
-              <button onClick={() => navigateTo('/my-orders')} className={navItemClass('/my-orders')} style={navItemStyle('/my-orders')}>
+              <button onClick={() => navigateTo('/orders')} className={navItemClass('/orders')} style={navItemStyle('/orders')}>
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/>
                 </svg>
@@ -173,11 +173,11 @@ export default function Header() {
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
                 Управление
               </p>
-              <button onClick={() => navigateTo('/queue')} className={navItemClass('/queue')} style={navItemStyle('/queue')}>
+              <button onClick={() => navigateTo('/orders')} className={navItemClass('/orders')} style={navItemStyle('/orders')}>
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="10"/>
+                  <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
                 </svg>
-                Очередь заявок
+                Все заявки
               </button>
               <button onClick={() => navigateTo('/dashboard')} className={navItemClass('/dashboard')} style={navItemStyle('/dashboard')}>
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">

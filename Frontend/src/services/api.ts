@@ -56,7 +56,7 @@ export const serviceApi = {
 
 // Order endpoints
 export const orderApi = {
-  getAll: () => api.get('/orders'),
+  getAll: (labId?: number) => api.get('/orders', { params: labId ? { labId } : {} }),
   getById: (id: number) => api.get(`/orders/${id}`),
   getMyOrders: (clientId: number) => api.get('/orders/my-orders', { params: { clientId } }),
   getByLabId: (labId: number) => api.get(`/orders/lab/${labId}`),
@@ -68,8 +68,13 @@ export const orderApi = {
 // Contract endpoints — исправлены маршруты
 export const contractApi = {
   getByOrderId: (orderId: number) => api.get(`/contracts/${orderId}`),
-  sign: (orderId: number, userId: number) => api.put(`/contracts/${orderId}/sign`, { userId }),
-  download: (orderId: number) => api.get(`/contracts/${orderId}/download`, { responseType: 'blob' }),
+  create: (orderId: number) => api.post(`/contracts/${orderId}`),
+  signByClient: (orderId: number, userId: number) =>
+    api.put(`/contracts/${orderId}/sign/client`, { userId }),
+  signByManager: (orderId: number, userId: number) =>
+    api.put(`/contracts/${orderId}/sign/manager`, { userId }),
+  download: (orderId: number) =>
+    api.get(`/contracts/${orderId}/download`, { responseType: 'blob' }),
 };
 
 // Result endpoints

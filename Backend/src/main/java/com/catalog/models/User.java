@@ -36,6 +36,9 @@ public class User {
     @Column(name = "password_reset_expires")
     private java.time.LocalDateTime passwordResetExpires;
 
+    @Column(name = "lab_id")
+    private Integer labId;
+
     public User() {}
 
     public User(String email, String passwordHash, String role, String fullName) {
@@ -75,4 +78,7 @@ public class User {
 
     public java.time.LocalDateTime getPasswordResetExpires() { return passwordResetExpires; }
     public void setPasswordResetExpires(java.time.LocalDateTime passwordResetExpires) { this.passwordResetExpires = passwordResetExpires; }
+
+    public Integer getLabId() { return labId; }
+    public void setLabId(Integer labId) { this.labId = labId; }
 }

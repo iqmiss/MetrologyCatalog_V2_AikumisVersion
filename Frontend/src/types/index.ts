@@ -5,6 +5,7 @@ export interface User {
   fullName: string;
   phone?: string;
   companyId?: number;
+  labId?: number;
   isActive: boolean;
 }
 
@@ -65,10 +66,13 @@ export interface Contract {
   id: number;
   orderId: number;
   contractNumber: string;
-  signedAt?: string;
   filePath?: string;
-  isSigned: boolean;
-  signedBy?: number;
+  clientSigned: boolean;
+  clientSignedAt?: string;
+  clientSignedBy?: number;
+  managerSigned: boolean;
+  managerSignedAt?: string;
+  managerSignedBy?: number;
 }
 
 export interface Result {

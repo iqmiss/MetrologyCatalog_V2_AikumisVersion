@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import api, { orderApi } from '../services/api';
+import { orderApi, contractApi } from '../services/api';
 import type { Order } from '../types';
 import { downloadCertificate } from '../utils/download';
 
 // Страница личного кабинета клиента
 // Показывает все заявки клиента с возможностью оплаты, скачивания договора и сертификата
-export default function MyOrders() {
+export default function Orders() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -17,13 +17,14 @@ export default function MyOrders() {
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [payingId, setPayingId] = useState<number | null>(null);
 
-  // Хранит статус договора для каждой заявки
-  // none — договор не скачивался, exists — скачан, signed — подписан ЭЦП
-  const [contractStatus, setContractStatus] = useState<Record<number, 'none' | 'exists' | 'signed'>>({});
+  const [contractData, setContractData] = useState<Record<number, {
+    clientSigned: boolean;
+    managerSigned: boolean;
+    downloaded: boolean;
+  }>>({});
 
   // Словарь для перевода статусов на русский язык
   const statusLabels: Record<string, string> = {
-    new: 'Новая',
     awaiting_payment: 'Ожидает оплаты',
     awaiting_delivery: 'Ожидает доставки',
     received_in_lab: 'Принято в лаб',
@@ -35,7 +36,6 @@ export default function MyOrders() {
 
   // Цвета бейджей для каждого статуса
   const statusColors: Record<string, { bg: string; text: string }> = {
-    new: { bg: 'bg-blue-100', text: 'text-blue-700' },
     awaiting_payment: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
     awaiting_delivery: { bg: 'bg-amber-100', text: 'text-amber-700' },
     received_in_lab: { bg: 'bg-purple-100', text: 'text-purple-700' },
@@ -45,23 +45,44 @@ export default function MyOrders() {
     cancelled: { bg: 'bg-gray-100', text: 'text-gray-500' },
   };
 
-  // Загружаем заявки текущего клиента при монтировании компонента
+  // Загружаем статус договоров для всех заявок
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (orders.length === 0) return;
+    orders.forEach(order => {
+      if (order.status === 'new') return;
+      contractApi.getByOrderId(order.id)
+        .then(res => {
+          setContractData(prev => ({
+            ...prev,
+            [order.id]: {
+              clientSigned: res.data.clientSigned,
+              managerSigned: res.data.managerSigned,
+              downloaded: prev[order.id]?.downloaded || false,
+            }
+          }));
+        })
+        .catch(() => {});
+    });
+  }, [orders]);
 
   const fetchOrders = async () => {
     try {
       setIsLoading(true);
-      // Получаем только заявки текущего пользователя по его ID
-      const response = await orderApi.getMyOrders(user?.id || 0);
+      // Менеджер видит все заявки, клиент только свои
+      const response = user?.role === 'manager'
+        ? await orderApi.getAll()
+        : await orderApi.getMyOrders(user?.id || 0);
       setOrders(response.data);
-    } catch (err: any) {
+    } catch {
       setError('Ошибка при загрузке заявок');
     } finally {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
 
   // Имитация оплаты — меняет статус с awaiting_payment на awaiting_delivery
   const handlePay = async (orderId: number) => {
@@ -84,7 +105,7 @@ export default function MyOrders() {
   // Если договор ещё не создан — создаёт его автоматически через POST
   const handleContract = async (orderId: number) => {
     try {
-      await api.post(`/contracts/${orderId}`);
+      await contractApi.create(orderId);
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:8081/api/contracts/${orderId}/download`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -97,20 +118,39 @@ export default function MyOrders() {
       a.download = `contract_${orderId}.pdf`;
       a.click();
       window.URL.revokeObjectURL(url);
-      setContractStatus(prev => ({ ...prev, [orderId]: 'exists' }));
+
+      // Отмечаем что договор скачан
+      setContractData(prev => ({
+        ...prev,
+        [orderId]: { ...prev[orderId], downloaded: true }
+      }));
     } catch {
       setError('Ошибка при создании договора');
     }
   };
 
-  // Имитация подписания договора через ЭЦП
-  const handleSignContract = async (orderId: number) => {
+  const handleManagerSign = async (orderId: number) => {
+    if (!window.confirm('Подписать договор как менеджер?')) return;
+    try {
+      await contractApi.signByManager(orderId, user?.id || 0);
+      setContractData(prev => ({
+        ...prev,
+        [orderId]: { ...prev[orderId], managerSigned: true }
+      }));
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка при подписании');
+    }
+  };
+
+  const handleClientSign = async (orderId: number) => {
     if (!window.confirm('Подписать договор ЭЦП?')) return;
     try {
-      await api.put(`/contracts/${orderId}/sign`, { userId: user?.id });
-      // Обновляем статус договора локально
-      setContractStatus(prev => ({ ...prev, [orderId]: 'signed' }));
-      alert('Договор подписан ЭЦП ✓');
+      await contractApi.signByClient(orderId, user?.id || 0);
+      setContractData(prev => ({
+        ...prev,
+        [orderId]: { ...prev[orderId], clientSigned: true }
+      }));
+      alert('Договор подписан ✓');
     } catch {
       setError('Ошибка при подписании');
     }
@@ -299,7 +339,7 @@ export default function MyOrders() {
                       </button>
                     )}
 
-                    {/* Договор и ЭЦП — для всех статусов кроме new */}
+                    {/* Договор и подписи */}
                     {order.status !== 'new' && (
                       <>
                         <button
@@ -308,27 +348,52 @@ export default function MyOrders() {
                           style={{ marginBottom: 0 }}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                            <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                            <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
                           </svg>
                           Договор
                         </button>
 
-                        {/* Кнопка подписания — появляется после скачивания договора */}
-                        {contractStatus[order.id] === 'exists' && (
+                        {/* Подпись клиента — только для роли client */}
+                        {user?.role === 'client' && contractData[order.id]?.downloaded && !contractData[order.id]?.clientSigned && (
                           <button
-                            onClick={() => handleSignContract(order.id)}
+                            onClick={() => handleClientSign(order.id)}
                             className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-medium rounded-lg border-none cursor-pointer text-sm transition-colors flex items-center gap-2"
                             style={{ marginBottom: 0 }}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                             </svg>
                             Подписать ЭЦП
                           </button>
                         )}
 
-                        {/* Отметка о подписании */}
-                        {contractStatus[order.id] === 'signed' && (
+                        {user?.role === 'client' && contractData[order.id]?.clientSigned && (
+                          <span className="flex items-center gap-1 text-sm text-emerald-600 font-medium px-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                              <path d="m9 11 3 3L22 4"/>
+                            </svg>
+                            Вы подписали
+                          </span>
+                        )}
+
+                        {/* Подпись менеджера — только для роли manager, после подписи клиента */}
+                        {user?.role === 'manager' && contractData[order.id]?.clientSigned && !contractData[order.id]?.managerSigned && (
+                          <button
+                            onClick={() => handleManagerSign(order.id)}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg border-none cursor-pointer text-sm transition-colors flex items-center gap-2"
+                            style={{ marginBottom: 0 }}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            Подписать (менеджер)
+                          </button>
+                        )}
+
+                        {user?.role === 'manager' && contractData[order.id]?.managerSigned && (
                           <span className="flex items-center gap-1 text-sm text-emerald-600 font-medium px-2">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                               <path d="m9 11 3 3L22 4"/>

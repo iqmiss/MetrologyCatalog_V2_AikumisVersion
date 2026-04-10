@@ -181,7 +181,7 @@ public class AuthController {
 
     // Генерирует JWT токен с данными пользователя
     private String generateToken(User user) {
-        return jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole());
+        return jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole(), user.getLabId());
     }
 
     // Вспомогательный метод для формирования ответа с ошибкой

@@ -96,12 +96,16 @@ public class PdfService {
                     .setWidth(UnitValue.createPercentValue(100));
 
             // Если договор подписан — показываем дату подписания, иначе "Не подписано"
-            String signStatus = contract.isSigned()
-                    ? "✓ Подписано ЭЦП\n" + (contract.getSignedAt() != null ? contract.getSignedAt().format(dateTimeFormatter) : "")
-                    : "Не подписано";
+            String clientStatus = contract.isClientSigned()
+                    ? "✓ Подписано ЭЦП\n" + (contract.getClientSignedAt() != null ? contract.getClientSignedAt().format(dateTimeFormatter) : "")
+                    : "Ожидает подписи";
 
-            signTable.addCell(new Cell().add(new Paragraph("Исполнитель: _______________")));
-            signTable.addCell(new Cell().add(new Paragraph("Заказчик: " + signStatus)));
+            String managerStatus = contract.isManagerSigned()
+                    ? "✓ Подписано ЭЦП\n" + (contract.getManagerSignedAt() != null ? contract.getManagerSignedAt().format(dateTimeFormatter) : "")
+                    : "Ожидает подписи";
+
+            signTable.addCell(new Cell().add(new Paragraph("Исполнитель (менеджер):\n" + managerStatus)));
+            signTable.addCell(new Cell().add(new Paragraph("Заказчик (клиент):\n" + clientStatus)));
 
             document.add(signTable);
 

@@ -47,6 +47,7 @@ CREATE TABLE `users` (
   `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `role` enum('client','metrolog','manager','admin') COLLATE utf8mb4_unicode_ci DEFAULT 'client',
   `company_id` int DEFAULT NULL,
+  `lab_id` int DEFAULT NULL,
   `full_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT '1',
@@ -59,7 +60,9 @@ CREATE TABLE `users` (
   KEY `idx_email` (`email`),
   KEY `idx_role` (`role`),
   KEY `idx_company_id` (`company_id`),
-  CONSTRAINT `users_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE SET NULL
+  KEY `idx_lab_id` (`lab_id`),
+  CONSTRAINT `users_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `users_ibfk_2` FOREIGN KEY (`lab_id`) REFERENCES `laboratories` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `laboratories` (
@@ -118,7 +121,7 @@ CREATE TABLE `orders` (
   `client_id` int NOT NULL,
   `service_id` int NOT NULL,
   `lab_id` int NOT NULL,
-  `status` enum('new','awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed','cancelled') COLLATE utf8mb4_unicode_ci DEFAULT 'new',
+  `status` enum('awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed','cancelled') COLLATE utf8mb4_unicode_ci DEFAULT 'new',
   `total_price` decimal(10,2) NOT NULL,
   `submit_date` datetime DEFAULT CURRENT_TIMESTAMP,
   `due_date` date DEFAULT NULL,
@@ -159,19 +162,27 @@ CREATE TABLE `contracts` (
   `id` int NOT NULL AUTO_INCREMENT,
   `order_id` int NOT NULL,
   `contract_number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `signed_at` datetime DEFAULT NULL,
   `file_path` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `is_signed` tinyint(1) DEFAULT '0',
-  `signed_by` int DEFAULT NULL,
+
+  `client_signed` tinyint(1) DEFAULT '0',
+  `client_signed_at` datetime DEFAULT NULL,
+  `client_signed_by` int DEFAULT NULL,
+
+  `manager_signed` tinyint(1) DEFAULT '0',
+  `manager_signed_at` datetime DEFAULT NULL,
+  `manager_signed_by` int DEFAULT NULL,
+
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `order_id` (`order_id`),
   UNIQUE KEY `contract_number` (`contract_number`),
-  KEY `signed_by` (`signed_by`),
+  KEY `client_signed_by` (`client_signed_by`),
+  KEY `manager_signed_by` (`manager_signed_by`),
   KEY `idx_order_id` (`order_id`),
   KEY `idx_contract_number` (`contract_number`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`client_signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `contracts_ibfk_3` FOREIGN KEY (`manager_signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `results` (
@@ -235,18 +246,19 @@ INSERT INTO `companies` (bin, name, address, phone, email) VALUES
 ('123456789012', 'ТОО Тест Компания', 'г. Астана, ул. Пушкина 1', '+77003333333', 'test@company.kz');
 
 -- Пользователи (пароль для всех: password)
-INSERT INTO `users` (email, password_hash, role, full_name, phone, company_id, is_active) VALUES
-('client@test.kz',        '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client',   'Иванов Иван',    '+77004444444', 1,    1),
-('metrolog@test.kz',      '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog', 'Петров Пётр',    '+77005555555', NULL, 1),
-('manager@metrology.kz',  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager',  'Сидоров Сидор',  '+77006666666', NULL, 1),
-('admin@metrology.kz',    '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin',    'Администратор',  '+77007777777', NULL, 1);
+INSERT INTO `users` (email, password_hash, role, full_name, phone, company_id, lab_id, is_active) VALUES
+('client@test.kz',        '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client',   'Клиентов Клиент',    '+77004444444', 1,    NULL, 1),
+('metrolog@test.kz',      '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog', 'Метробаев Лог',    '+77005555555', NULL, 1,    1),
+('metrolog2@test.kz',     '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog', 'Логов Метр','+77008888888', NULL, 2,    1),
+('manager@metrology.kz',  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager',  'Менеджерович Менеджер',  '+77006666666', NULL, NULL, 1),
+('admin@metrology.kz',    '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin',    'Админский Стратор',  '+77007777777', NULL, NULL, 1);
 
 -- Заявки
 INSERT INTO `orders` (order_number, client_id, service_id, lab_id, status, total_price, due_date) VALUES
 ('ORD-001', 1, 1, 1, 'completed',        5000.00, '2026-03-15'),
 ('ORD-002', 1, 2, 1, 'in_work',          3500.00, '2026-03-25'),
 ('ORD-003', 1, 3, 2, 'awaiting_payment', 4500.00, '2026-04-01'),
-('ORD-004', 1, 4, 2, 'new',              4000.00, '2026-04-10');
+('ORD-004', 1, 4, 2, 'awaiting_payment', 4000.00, '2026-04-10');
 
 -- Приборы в заявках
 INSERT INTO `order_items` (order_id, device_type, model, serial_number, quantity, unit_price) VALUES
@@ -256,11 +268,11 @@ INSERT INTO `order_items` (order_id, device_type, model, serial_number, quantity
 (4, 'Вольтметр', 'В-7-78',  'SN-004', 1, 4000.00);
 
 -- Договоры
-INSERT INTO `contracts` (order_id, contract_number, is_signed) VALUES
-(1, 'CNT-001', 1),
-(2, 'CNT-002', 0),
-(3, 'CNT-003', 0),
-(4, 'CNT-004', 0);
+INSERT INTO `contracts` (order_id, contract_number, client_signed, manager_signed) VALUES
+(1, 'CNT-001', 1, 1),
+(2, 'CNT-002', 0, 0),
+(3, 'CNT-003', 0, 0),
+(4, 'CNT-004', 0, 0);
 
 -- Результат для завершённой заявки
 INSERT INTO `results` (order_id, result_type, issued_at, metrologist_id, is_signed, signed_at) VALUES

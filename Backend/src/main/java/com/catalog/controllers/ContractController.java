@@ -74,7 +74,8 @@ public class ContractController {
             Contract contract = new Contract();
             contract.setOrderId(orderId);
             contract.setContractNumber("CNT-" + System.currentTimeMillis());
-            contract.setSigned(false);
+            contract.setClientSigned(false);
+            contract.setManagerSigned(false);
             contractRepository.save(contract);
 
             // Возвращаем сохранённый договор с присвоенным id
@@ -85,21 +86,49 @@ public class ContractController {
         }
     }
 
-    // PUT /api/contracts/{orderId}/sign
-    // Подписывает договор — имитация ЭЦП
-    // Вызывается из MyOrders.tsx при нажатии "✍️ Подписать ЭЦП"
-    @PutMapping("/{orderId}/sign")
-    public ResponseEntity<?> signContract(@PathVariable int orderId, @RequestBody SignRequest request) {
+    // PUT /api/contracts/{orderId}/sign/client
+    // Клиент подписывает договор со своей стороны
+    @PutMapping("/{orderId}/sign/client")
+    public ResponseEntity<?> signByClient(@PathVariable int orderId, @RequestBody SignRequest request) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
             if (contract == null) {
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
             }
+            if (contract.isClientSigned()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Клиент уже подписал договор"));
+            }
 
-            // Фиксируем подпись: отмечаем как подписанный, сохраняем время и ID подписанта
-            contract.setSigned(true);
-            contract.setSignedAt(LocalDateTime.now());
-            contract.setSignedBy(request.getUserId());
+            contract.setClientSigned(true);
+            contract.setClientSignedAt(LocalDateTime.now());
+            contract.setClientSignedBy(request.getUserId());
+            contractRepository.save(contract);
+
+            return ResponseEntity.ok(contract);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
+        }
+    }
+
+    // PUT /api/contracts/{orderId}/sign/manager
+    // Менеджер подписывает договор — только после подписи клиента
+    @PutMapping("/{orderId}/sign/manager")
+    public ResponseEntity<?> signByManager(@PathVariable int orderId, @RequestBody SignRequest request) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) {
+                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
+            }
+            if (!contract.isClientSigned()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Сначала должен подписать клиент"));
+            }
+            if (contract.isManagerSigned()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Менеджер уже подписал договор"));
+            }
+
+            contract.setManagerSigned(true);
+            contract.setManagerSignedAt(LocalDateTime.now());
+            contract.setManagerSignedBy(request.getUserId());
             contractRepository.save(contract);
 
             return ResponseEntity.ok(contract);

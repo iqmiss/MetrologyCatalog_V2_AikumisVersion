@@ -3,6 +3,7 @@ package com.catalog.configs;
 import com.catalog.utils.JwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -47,6 +48,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/reset-password").permitAll()
                 .requestMatchers("/api/services").permitAll()
                 .requestMatchers("/api/services/**").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/client").hasRole("CLIENT")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/manager").hasRole("MANAGER")
 
                 // Все остальные endpoints требуют авторизации
                 .anyRequest().authenticated()

@@ -10,7 +10,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Catalog from './pages/Catalog';
 import CreateOrder from './pages/CreateOrder';
-import MyOrders from './pages/MyOrders';
+import Orders from './pages/Orders';
 import Profile from './pages/Profile';
 import Queue from './pages/Queue';
 import NotFound from './components/NotFound';
@@ -39,9 +39,9 @@ function AppLayout() {
 
           <Route path="/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
           <Route path="/create-order" element={<ProtectedRoute requiredRoles={['client']}><CreateOrder /></ProtectedRoute>} />
-          <Route path="/my-orders" element={<ProtectedRoute requiredRoles={['client']}><MyOrders /></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute requiredRoles={['client', 'manager']}><Orders /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/queue" element={<ProtectedRoute requiredRoles={['metrolog', 'manager']}><Queue /></ProtectedRoute>} />
+          <Route path="/queue" element={<ProtectedRoute requiredRoles={['metrolog']}><Queue /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['manager']}><Dashboard /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute requiredRoles={['manager']}><Reports /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requiredRoles={['admin']}><AdminUsers /></ProtectedRoute>} />

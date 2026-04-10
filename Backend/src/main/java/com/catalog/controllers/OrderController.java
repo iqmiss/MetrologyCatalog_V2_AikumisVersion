@@ -45,12 +45,14 @@ public class OrderController {
         this.contractRepository = contractRepository;
     }
 
-    // GET /api/orders
+    // GET /api/orders?labId=1
     // Возвращает все заявки — используется метрологом и менеджером в Queue
     @GetMapping
-    public ResponseEntity<?> getAllOrders() {
+    public ResponseEntity<?> getAllOrders(@RequestParam(required = false) Integer labId) {
         try {
-            List<Order> orders = orderRepository.findAll();
+            List<Order> orders = labId != null
+                ? orderRepository.findByLabId(labId)
+                : orderRepository.findAll();
             return ResponseEntity.ok(orders);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при получении заказов"));
@@ -153,7 +155,7 @@ public class OrderController {
             order.setClientId(request.getClientId());
             order.setServiceId(request.getServiceId());
             order.setLabId(request.getLabId());
-            order.setStatus("new");
+            order.setStatus("awaiting_payment");
             order.setTotalPrice(request.getTotalPrice());
             order.setDueDate(LocalDate.parse(request.getDueDate()));
             orderRepository.save(order);
@@ -174,7 +176,8 @@ public class OrderController {
             Contract contract = new Contract();
             contract.setOrderId(order.getId());
             contract.setContractNumber("CNT-" + System.currentTimeMillis());
-            contract.setSigned(false);
+            contract.setClientSigned(false);
+            contract.setManagerSigned(false);
             contractRepository.save(contract);
 
             // Возвращаем созданную заявку из БД
@@ -195,7 +198,6 @@ public class OrderController {
             @RequestBody UpdateStatusRequest request
     ) {
         try {
-            // Валидация — проверяем что переданный статус допустимый
             List<String> validStatuses = List.of(
                 "new", "awaiting_payment", "awaiting_delivery",
                 "received_in_lab", "in_work", "under_review", "completed", "cancelled"
@@ -209,7 +211,17 @@ public class OrderController {
                 return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
             }
 
-            // Обновляем статус в БД
+            // Блокируем переход в received_in_lab если договор не подписан обеими сторонами
+            // Метролог не может взять заявку пока менеджер не подписал договор
+            if ("received_in_lab".equals(request.getStatus())) {
+                Contract contract = contractRepository.findByOrderId(id).orElse(null);
+                if (contract == null || !contract.isClientSigned() || !contract.isManagerSigned()) {
+                    return ResponseEntity.status(400).body(
+                        errorResponse("Договор должен быть подписан клиентом и менеджером")
+                    );
+                }
+            }
+
             order.setStatus(request.getStatus());
             orderRepository.save(order);
 
@@ -217,14 +229,12 @@ public class OrderController {
             User client = userRepository.findById(order.getClientId()).orElse(null);
             if (client != null && client.getEmail() != null) {
                 if ("completed".equals(request.getStatus())) {
-                    // Специальное письмо когда заявка завершена
                     emailService.sendOrderCompleted(
                         client.getEmail(),
                         client.getFullName(),
                         order.getOrderNumber()
                     );
                 } else {
-                    // Стандартное письмо об изменении статуса
                     emailService.sendStatusUpdate(
                         client.getEmail(),
                         client.getFullName(),

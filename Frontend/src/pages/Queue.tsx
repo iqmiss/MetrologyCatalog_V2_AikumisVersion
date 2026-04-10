@@ -7,6 +7,7 @@ import { downloadCertificate, downloadContract } from '../utils/download';
 // Страница очереди заявок для ролей metrolog и manager
 // Показывает все заявки в системе и позволяет управлять их статусами
 export default function Queue() {
+
   const { user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,7 +22,6 @@ export default function Queue() {
 
   // Словарь для перевода статусов на русский язык
   const statusLabels: Record<string, string> = {
-    new: 'Новая',
     awaiting_payment: 'Ожидает оплаты',
     awaiting_delivery: 'Ожидает доставки',
     received_in_lab: 'Принято в лаб',
@@ -33,7 +33,6 @@ export default function Queue() {
 
   // Определяет следующий статус для каждого текущего
   const statusFlow: Record<string, string> = {
-    new: 'awaiting_payment',
     awaiting_payment: 'awaiting_payment',
     awaiting_delivery: 'received_in_lab',
     received_in_lab: 'in_work',
@@ -45,7 +44,6 @@ export default function Queue() {
 
   // Цвета бейджей для каждого статуса
   const statusColors: Record<string, { bg: string; text: string }> = {
-    new: { bg: 'bg-blue-100', text: 'text-blue-700' },
     awaiting_payment: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
     awaiting_delivery: { bg: 'bg-amber-100', text: 'text-amber-700' },
     received_in_lab: { bg: 'bg-purple-100', text: 'text-purple-700' },
@@ -61,16 +59,19 @@ export default function Queue() {
   }, []);
 
   const fetchOrders = async () => {
-    try {
-      setIsLoading(true);
-      const response = await orderApi.getAll();
-      setOrders(response.data);
-    } catch {
-      setError('Ошибка при загрузке заявок');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  try {
+    setIsLoading(true);
+    // Метролог видит только заявки своей лаборатории
+    // Менеджер видит все заявки
+    const labId = user?.role === 'metrolog' ? user?.labId : undefined;
+    const response = await orderApi.getAll(labId);
+    setOrders(response.data);
+  } catch {
+    setError('Ошибка при загрузке заявок');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Обрабатывает нажатие кнопки "Далее →"
   // Если следующий статус — completed, показываем модалку для заполнения результата
@@ -86,12 +87,13 @@ export default function Queue() {
 
     try {
       await orderApi.updateStatus(orderId, nextStatus);
-      // Обновляем статус локально без перезагрузки страницы
       setOrders(prev =>
         prev.map(o => o.id === orderId ? { ...o, status: nextStatus as Order['status'] } : o)
       );
-    } catch {
-      setError('Ошибка при изменении статуса');
+    } catch (err: any) {
+      // Показываем сообщение с бэкенда если есть
+      const msg = err.response?.data?.message || 'Ошибка при изменении статуса';
+      setError(msg);
     }
   };
 
@@ -229,8 +231,8 @@ export default function Queue() {
                         <span className="text-xs text-yellow-600 font-medium px-2 py-1.5">Ожидает оплаты</span>
                       )}
 
-                      {/* Кнопка договора — доступна для всех статусов кроме new */}
-                      {order.status !== 'new' && (
+                      {/* Кнопка договора — доступна для всех статусов */}
+                      {(
                         <button
                           onClick={() => downloadContract(order.id, order.orderNumber, api, setError)}
                           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg border-none cursor-pointer text-xs transition-colors flex items-center gap-1"

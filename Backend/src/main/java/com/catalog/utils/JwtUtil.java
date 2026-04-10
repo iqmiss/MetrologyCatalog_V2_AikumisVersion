@@ -27,16 +27,21 @@ public class JwtUtil {
 
     // Генерирует JWT токен с данными пользователя
     // Вызывается в AuthController при успешном логине
-    public String generateToken(int userId, String email, String role) {
+    public String generateToken(int userId, String email, String role, Integer labId) {
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
                 .claim("email", email)
                 .claim("role", role)
+                .claim("labId", labId)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
+
+    public Integer getLabId(String token) {
+        return getClaims(token).get("labId", Integer.class);
+    }   
 
     // Извлекает ID пользователя из токена
     public int getUserId(String token) {
