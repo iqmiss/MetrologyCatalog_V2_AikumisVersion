@@ -121,7 +121,7 @@ CREATE TABLE `orders` (
   `client_id` int NOT NULL,
   `service_id` int NOT NULL,
   `lab_id` int NOT NULL,
-  `status` enum('awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed','cancelled') COLLATE utf8mb4_unicode_ci DEFAULT 'new',
+  `status` enum('awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed','cancelled') COLLATE utf8mb4_unicode_ci DEFAULT 'awaiting_payment',
   `total_price` decimal(10,2) NOT NULL,
   `submit_date` datetime DEFAULT CURRENT_TIMESTAMP,
   `due_date` date DEFAULT NULL,
