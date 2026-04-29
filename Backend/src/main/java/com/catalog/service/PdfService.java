@@ -26,7 +26,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
 
 @Service
-@PropertySource(value = "classpath:executor.properties", encoding = "UTF-8")
+@PropertySource(value = "classpath:executor.properties", encoding = "UTF-8", ignoreResourceNotFound = true)
 public class PdfService {
 
     private final OrderRepository orderRepository;
