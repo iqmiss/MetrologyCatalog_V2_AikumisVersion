@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { orderApi, contractApi, serviceApi } from '../services/api';
-import api from '../services/api';
 import type { Order, Service } from '../types';
 import { downloadCertificate } from '../utils/download';
 
