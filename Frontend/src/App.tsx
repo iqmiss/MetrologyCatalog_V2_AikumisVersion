@@ -17,6 +17,9 @@ import NotFound from './components/NotFound';
 import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
 import AdminUsers from './pages/AdminUsers';
+import Approver from './pages/Approver';
+import Director from './pages/Director';
+import Financier from './pages/Financier';
 import './App.css';
 
 const NO_HEADER_PATHS = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
@@ -38,13 +41,16 @@ function AppLayout() {
           <Route path="/" element={<Home />} />
 
           <Route path="/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
-          <Route path="/create-order" element={<ProtectedRoute requiredRoles={['client']}><CreateOrder /></ProtectedRoute>} />
+          <Route path="/create-order" element={<ProtectedRoute requiredRoles={['client', 'manager']}><CreateOrder /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute requiredRoles={['client', 'manager']}><Orders /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/queue" element={<ProtectedRoute requiredRoles={['metrolog']}><Queue /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['manager']}><Dashboard /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute requiredRoles={['manager']}><Reports /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requiredRoles={['admin']}><AdminUsers /></ProtectedRoute>} />
+          <Route path="/approver" element={<ProtectedRoute requiredRoles={['approver']}><Approver /></ProtectedRoute>} />
+          <Route path="/director" element={<ProtectedRoute requiredRoles={['director']}><Director /></ProtectedRoute>} />
+          <Route path="/financier" element={<ProtectedRoute requiredRoles={['financier']}><Financier /></ProtectedRoute>} />
 
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />

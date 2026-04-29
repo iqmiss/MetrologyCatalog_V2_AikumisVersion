@@ -16,11 +16,14 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(nullable = false, columnDefinition = "ENUM('client','metrolog','manager','admin')")
+    @Column(nullable = false, columnDefinition = "ENUM('client','metrolog','manager','director','financier','approver','admin')")
     private String role;
 
     @Column(name = "company_id")
     private Integer companyId;
+
+    @Column(name = "lab_id")
+    private Integer labId;
 
     @Column(name = "full_name")
     private String fullName;
@@ -35,9 +38,6 @@ public class User {
 
     @Column(name = "password_reset_expires")
     private java.time.LocalDateTime passwordResetExpires;
-
-    @Column(name = "lab_id")
-    private Integer labId;
 
     public User() {}
 
@@ -64,21 +64,21 @@ public class User {
     public Integer getCompanyId() { return companyId; }
     public void setCompanyId(Integer companyId) { this.companyId = companyId; }
 
+    public Integer getLabId() { return labId; }
+    public void setLabId(Integer labId) { this.labId = labId; }
+
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
-
+    
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
 
     public String getPasswordResetToken() { return passwordResetToken; }
     public void setPasswordResetToken(String passwordResetToken) { this.passwordResetToken = passwordResetToken; }
-
+    
     public java.time.LocalDateTime getPasswordResetExpires() { return passwordResetExpires; }
     public void setPasswordResetExpires(java.time.LocalDateTime passwordResetExpires) { this.passwordResetExpires = passwordResetExpires; }
-
-    public Integer getLabId() { return labId; }
-    public void setLabId(Integer labId) { this.labId = labId; }
 }

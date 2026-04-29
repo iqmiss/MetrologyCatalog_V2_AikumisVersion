@@ -17,22 +17,18 @@ import java.util.List;
 import java.util.Map;
 
 // Контроллер для управления заявками
-// Обрабатывает все операции с заявками: создание, получение, смена статуса
+// Обрабатывает все операции с заявками: создание, получение, смена статуса, редактирование
 @RestController
 @RequestMapping("/api/orders")
 @CrossOrigin(origins = "http://localhost:5173")
 public class OrderController {
 
-    // Репозитории для работы с таблицами БД
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final UserRepository userRepository;
     private final ContractRepository contractRepository;
-
-    // Сервис для отправки email уведомлений
     private final EmailService emailService;
 
-    // Spring автоматически передаёт все зависимости через конструктор (Dependency Injection)
     public OrderController(OrderRepository orderRepository,
                         OrderItemRepository orderItemRepository,
                         UserRepository userRepository,
@@ -46,7 +42,7 @@ public class OrderController {
     }
 
     // GET /api/orders?labId=1
-    // Возвращает все заявки — используется метрологом и менеджером в Queue
+    // Возвращает все заявки — используется метрологом и менеджером
     @GetMapping
     public ResponseEntity<?> getAllOrders(@RequestParam(required = false) Integer labId) {
         try {
@@ -75,7 +71,7 @@ public class OrderController {
     }
 
     // GET /api/orders/my-orders?clientId=1
-    // Возвращает заявки конкретного клиента — используется в MyOrders
+    // Возвращает заявки конкретного клиента
     @GetMapping("/my-orders")
     public ResponseEntity<?> getMyOrders(@RequestParam int clientId) {
         try {
@@ -111,11 +107,10 @@ public class OrderController {
     }
 
     // POST /api/orders
-    // Создаёт новую заявку, сохраняет приборы и автоматически генерирует договор
+    // Создаёт новую заявку — доступно клиенту и менеджеру
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody CreateOrderRequest request) {
         try {
-            // Валидация обязательных полей заявки
             if (request.getClientId() == null) {
                 return ResponseEntity.status(400).body(errorResponse("ID клиента обязателен"));
             }
@@ -135,7 +130,6 @@ public class OrderController {
                 return ResponseEntity.status(400).body(errorResponse("Добавьте хотя бы один прибор"));
             }
 
-            // Валидация каждого прибора в заявке
             for (OrderItemRequest item : request.getOrderItems()) {
                 if (item.getDeviceType() == null || item.getDeviceType().isEmpty()) {
                     return ResponseEntity.status(400).body(errorResponse("Тип прибора обязателен"));
@@ -148,19 +142,19 @@ public class OrderController {
                 }
             }
 
-            // Создаём объект заявки и сохраняем в БД
-            // После save() объект order получает сгенерированный id из БД
             Order order = new Order();
             order.setOrderNumber("ORD-" + System.currentTimeMillis());
             order.setClientId(request.getClientId());
             order.setServiceId(request.getServiceId());
             order.setLabId(request.getLabId());
-            order.setStatus("awaiting_payment");
+            order.setStatus("pending_contract");
             order.setTotalPrice(request.getTotalPrice());
             order.setDueDate(LocalDate.parse(request.getDueDate()));
+            if (request.getClientComment() != null) {
+                order.setClientComment(request.getClientComment());
+            }
             orderRepository.save(order);
 
-            // Сохраняем приборы привязанные к заявке (таблица order_items)
             for (OrderItemRequest itemReq : request.getOrderItems()) {
                 OrderItem item = new OrderItem();
                 item.setOrderId(order.getId());
@@ -177,10 +171,8 @@ public class OrderController {
             contract.setOrderId(order.getId());
             contract.setContractNumber("CNT-" + System.currentTimeMillis());
             contract.setClientSigned(false);
-            contract.setManagerSigned(false);
             contractRepository.save(contract);
 
-            // Возвращаем созданную заявку из БД
             Order createdOrder = orderRepository.findById(order.getId()).orElse(null);
             return ResponseEntity.status(201).body(createdOrder);
         } catch (Exception e) {
@@ -189,18 +181,43 @@ public class OrderController {
         }
     }
 
+    // PUT /api/orders/{id}
+    // Менеджер редактирует заявку — услугу, лабораторию, дату, стоимость, комментарий
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateOrder(@PathVariable int id, @RequestBody UpdateOrderRequest request) {
+        try {
+            Order order = orderRepository.findById(id).orElse(null);
+            if (order == null) {
+                return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
+            }
+
+            if (request.getServiceId() != null) order.setServiceId(request.getServiceId());
+            if (request.getLabId() != null) order.setLabId(request.getLabId());
+            if (request.getTotalPrice() != null) order.setTotalPrice(request.getTotalPrice());
+            if (request.getDueDate() != null && !request.getDueDate().isEmpty()) {
+                order.setDueDate(LocalDate.parse(request.getDueDate()));
+            }
+            if (request.getClientComment() != null) order.setClientComment(request.getClientComment());
+
+            orderRepository.save(order);
+            return ResponseEntity.ok(order);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(errorResponse("Ошибка при редактировании заявки"));
+        }
+    }
+
     // PUT /api/orders/{id}/status
     // Обновляет статус заявки и отправляет email уведомление клиенту
-    // Используется метрологом в Queue при нажатии "Далее →"
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateOrderStatus(
             @PathVariable int id,
-            @RequestBody UpdateStatusRequest request
-    ) {
+            @RequestBody UpdateStatusRequest request) {
         try {
             List<String> validStatuses = List.of(
-                "new", "awaiting_payment", "awaiting_delivery",
-                "received_in_lab", "in_work", "under_review", "completed", "cancelled"
+                "pending_contract", "awaiting_approval", "awaiting_director",
+                "awaiting_payment", "awaiting_delivery", "received_in_lab",
+                "in_work", "under_review", "completed", "cancelled",
+                "annulled", "terminated"
             );
             if (request.getStatus() == null || !validStatuses.contains(request.getStatus())) {
                 return ResponseEntity.status(400).body(errorResponse("Недопустимый статус: " + request.getStatus()));
@@ -211,13 +228,12 @@ public class OrderController {
                 return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
             }
 
-            // Блокируем переход в received_in_lab если договор не подписан обеими сторонами
-            // Метролог не может взять заявку пока менеджер не подписал договор
+            // Блокируем переход в received_in_lab если договор не подписан
             if ("received_in_lab".equals(request.getStatus())) {
                 Contract contract = contractRepository.findByOrderId(id).orElse(null);
-                if (contract == null || !contract.isClientSigned() || !contract.isManagerSigned()) {
+                if (contract == null || !contract.isClientSigned() || !contract.isDirectorSigned()) {
                     return ResponseEntity.status(400).body(
-                        errorResponse("Договор должен быть подписан клиентом и менеджером")
+                        errorResponse("Договор должен быть подписан клиентом и директором")
                     );
                 }
             }
@@ -225,22 +241,15 @@ public class OrderController {
             order.setStatus(request.getStatus());
             orderRepository.save(order);
 
-            // Отправляем email уведомление клиенту об изменении статуса
+            // Email уведомление клиенту
             User client = userRepository.findById(order.getClientId()).orElse(null);
             if (client != null && client.getEmail() != null) {
                 if ("completed".equals(request.getStatus())) {
                     emailService.sendOrderCompleted(
-                        client.getEmail(),
-                        client.getFullName(),
-                        order.getOrderNumber()
-                    );
+                        client.getEmail(), client.getFullName(), order.getOrderNumber());
                 } else {
                     emailService.sendStatusUpdate(
-                        client.getEmail(),
-                        client.getFullName(),
-                        order.getOrderNumber(),
-                        request.getStatus()
-                    );
+                        client.getEmail(), client.getFullName(), order.getOrderNumber(), request.getStatus());
                 }
             }
 
@@ -250,21 +259,41 @@ public class OrderController {
         }
     }
 
-    // Вспомогательный метод для формирования ответа с ошибкой
+    // PUT /api/orders/{id}/payment
+    // Финансист подтверждает оплату или пропускает
+    @PutMapping("/{id}/payment")
+    public ResponseEntity<?> confirmPayment(@PathVariable int id, @RequestBody PaymentRequest request) {
+        try {
+            Order order = orderRepository.findById(id).orElse(null);
+            if (order == null) {
+                return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
+            }
+
+            order.setStatus("awaiting_delivery");
+            if (request.getComment() != null) order.setPaymentComment(request.getComment());
+            if (request.getInvoiceAmount() != null) order.setInvoiceAmount(request.getInvoiceAmount());
+
+            orderRepository.save(order);
+            return ResponseEntity.ok(order);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(errorResponse("Ошибка при подтверждении оплаты"));
+        }
+    }
+
     private Map<String, String> errorResponse(String message) {
         Map<String, String> response = new HashMap<>();
         response.put("message", message);
         return response;
     }
 
-    // Класс для десериализации тела запроса при создании заявки
     public static class CreateOrderRequest {
-        public Integer clientId;  // ID клиента который подаёт заявку
-        public Integer serviceId; // ID выбранной услуги из каталога
-        public Integer labId;     // ID выбранной лаборатории
-        public Double totalPrice; // Итоговая стоимость (цена × количество)
-        public String dueDate;    // Плановая дата сдачи прибора
-        public List<OrderItemRequest> orderItems; // Список приборов
+        public Integer clientId;
+        public Integer serviceId;
+        public Integer labId;
+        public Double totalPrice;
+        public String dueDate;
+        public List<OrderItemRequest> orderItems;
+        public String clientComment;
 
         public Integer getClientId() { return clientId; }
         public Integer getServiceId() { return serviceId; }
@@ -272,15 +301,29 @@ public class OrderController {
         public Double getTotalPrice() { return totalPrice; }
         public String getDueDate() { return dueDate; }
         public List<OrderItemRequest> getOrderItems() { return orderItems; }
+        public String getClientComment() { return clientComment; }
     }
 
-    // Класс для десериализации данных одного прибора в заявке
+    public static class UpdateOrderRequest {
+        public Integer serviceId;
+        public Integer labId;
+        public Double totalPrice;
+        public String dueDate;
+        public String clientComment;
+
+        public Integer getServiceId() { return serviceId; }
+        public Integer getLabId() { return labId; }
+        public Double getTotalPrice() { return totalPrice; }
+        public String getDueDate() { return dueDate; }
+        public String getClientComment() { return clientComment; }
+    }
+
     public static class OrderItemRequest {
-        public String deviceType;   // Тип прибора (Манометр, Термометр и т.д.)
-        public String model;        // Модель прибора
-        public String serialNumber; // Заводской серийный номер
-        public Integer quantity;    // Количество единиц
-        public Double unitPrice;    // Цена за единицу
+        public String deviceType;
+        public String model;
+        public String serialNumber;
+        public Integer quantity;
+        public Double unitPrice;
 
         public String getDeviceType() { return deviceType; }
         public String getModel() { return model; }
@@ -289,9 +332,17 @@ public class OrderController {
         public Double getUnitPrice() { return unitPrice; }
     }
 
-    // Класс для десериализации запроса на смену статуса
     public static class UpdateStatusRequest {
-        public String status; // Новый статус заявки
+        public String status;
         public String getStatus() { return status; }
+    }
+
+    public static class PaymentRequest {
+        public String comment;
+        public boolean paid;
+        public Double invoiceAmount;
+        public String getComment() { return comment; }
+        public boolean isPaid() { return paid; }
+        public Double getInvoiceAmount() { return invoiceAmount; }
     }
 }

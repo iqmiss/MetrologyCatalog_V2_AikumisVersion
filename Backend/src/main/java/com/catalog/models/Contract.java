@@ -20,6 +20,11 @@ public class Contract {
     @Column(name = "file_path")
     private String filePath;
 
+    // Статус договора
+    @Column(columnDefinition = "ENUM('draft','pending_approval','approved','signed','rejected','annulled','terminated')")
+    private String status;
+
+    // Подпись клиента
     @Column(name = "client_signed")
     private boolean clientSigned;
 
@@ -29,18 +34,39 @@ public class Contract {
     @Column(name = "client_signed_by")
     private Integer clientSignedBy;
 
-    // Подпись менеджера
-    @Column(name = "manager_signed")
-    private boolean managerSigned;
+    // Подпись директора
+    @Column(name = "director_signed")
+    private boolean directorSigned;
 
-    @Column(name = "manager_signed_at")
-    private LocalDateTime managerSignedAt;
+    @Column(name = "director_signed_at")
+    private LocalDateTime directorSignedAt;
 
-    @Column(name = "manager_signed_by")
-    private Integer managerSignedBy;
+    @Column(name = "director_signed_by")
+    private Integer directorSignedBy;
 
+    // Аннулирование
+    @Column(name = "annulled_at")
+    private LocalDateTime annulledAt;
+
+    @Column(name = "annulled_by")
+    private Integer annulledBy;
+
+    @Column(name = "annulled_reason")
+    private String annulledReason;
+
+    // Расторжение
+    @Column(name = "terminated_at")
+    private LocalDateTime terminatedAt;
+
+    @Column(name = "terminated_by")
+    private Integer terminatedBy;
+
+    @Column(name = "terminated_reason")
+    private String terminatedReason;
+
+    // Договор полностью подписан когда оба подписали
     public boolean isFullySigned() {
-        return clientSigned && managerSigned;
+        return clientSigned && directorSigned;
     }
 
     public Contract() {}
@@ -48,13 +74,14 @@ public class Contract {
     public Contract(int orderId, String contractNumber) {
         this.orderId = orderId;
         this.contractNumber = contractNumber;
+        this.status = "draft";
         this.clientSigned = false;
-        this.managerSigned = false;
+        this.directorSigned = false;
     }
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
-
+    
     public int getOrderId() { return orderId; }
     public void setOrderId(int orderId) { this.orderId = orderId; }
 
@@ -63,6 +90,9 @@ public class Contract {
 
     public String getFilePath() { return filePath; }
     public void setFilePath(String filePath) { this.filePath = filePath; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
     public boolean isClientSigned() { return clientSigned; }
     public void setClientSigned(boolean clientSigned) { this.clientSigned = clientSigned; }
@@ -73,12 +103,30 @@ public class Contract {
     public Integer getClientSignedBy() { return clientSignedBy; }
     public void setClientSignedBy(Integer clientSignedBy) { this.clientSignedBy = clientSignedBy; }
 
-    public boolean isManagerSigned() { return managerSigned; }
-    public void setManagerSigned(boolean managerSigned) { this.managerSigned = managerSigned; }
+    public boolean isDirectorSigned() { return directorSigned; }
+    public void setDirectorSigned(boolean directorSigned) { this.directorSigned = directorSigned; }
 
-    public LocalDateTime getManagerSignedAt() { return managerSignedAt; }
-    public void setManagerSignedAt(LocalDateTime managerSignedAt) { this.managerSignedAt = managerSignedAt; }
+    public LocalDateTime getDirectorSignedAt() { return directorSignedAt; }
+    public void setDirectorSignedAt(LocalDateTime directorSignedAt) { this.directorSignedAt = directorSignedAt; }
 
-    public Integer getManagerSignedBy() { return managerSignedBy; }
-    public void setManagerSignedBy(Integer managerSignedBy) { this.managerSignedBy = managerSignedBy; }
+    public Integer getDirectorSignedBy() { return directorSignedBy; }
+    public void setDirectorSignedBy(Integer directorSignedBy) { this.directorSignedBy = directorSignedBy; }
+
+    public LocalDateTime getAnnulledAt() { return annulledAt; }
+    public void setAnnulledAt(LocalDateTime annulledAt) { this.annulledAt = annulledAt; }
+
+    public Integer getAnnulledBy() { return annulledBy; }
+    public void setAnnulledBy(Integer annulledBy) { this.annulledBy = annulledBy; }
+
+    public String getAnnulledReason() { return annulledReason; }
+    public void setAnnulledReason(String annulledReason) { this.annulledReason = annulledReason; }
+    
+    public LocalDateTime getTerminatedAt() { return terminatedAt; }
+    public void setTerminatedAt(LocalDateTime terminatedAt) { this.terminatedAt = terminatedAt; }
+
+    public Integer getTerminatedBy() { return terminatedBy; }
+    public void setTerminatedBy(Integer terminatedBy) { this.terminatedBy = terminatedBy; }
+
+    public String getTerminatedReason() { return terminatedReason; }
+    public void setTerminatedReason(String terminatedReason) { this.terminatedReason = terminatedReason; }
 }

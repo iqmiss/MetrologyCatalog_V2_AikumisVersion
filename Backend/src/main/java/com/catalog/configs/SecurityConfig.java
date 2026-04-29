@@ -49,7 +49,11 @@ public class SecurityConfig {
                 .requestMatchers("/api/services").permitAll()
                 .requestMatchers("/api/services/**").permitAll()
                 .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/client").hasRole("CLIENT")
-                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/manager").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/director").hasRole("DIRECTOR")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/approve").hasAnyRole("APPROVER")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/reject").hasAnyRole("APPROVER")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/submit").hasRole("MANAGER")
+                .requestMatchers(HttpMethod.POST, "/api/contracts/*").hasRole("MANAGER")
 
                 // Все остальные endpoints требуют авторизации
                 .anyRequest().authenticated()

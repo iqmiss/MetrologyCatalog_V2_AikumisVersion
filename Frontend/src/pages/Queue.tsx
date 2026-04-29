@@ -22,35 +22,44 @@ export default function Queue() {
 
   // Словарь для перевода статусов на русский язык
   const statusLabels: Record<string, string> = {
-    awaiting_payment: 'Ожидает оплаты',
+    pending_contract:  'Ожидает договора',
+    awaiting_approval: 'На согласовании',
+    awaiting_director: 'У директора',
+    awaiting_payment:  'Ожидает оплаты',
     awaiting_delivery: 'Ожидает доставки',
-    received_in_lab: 'Принято в лаб',
-    in_work: 'В работе',
-    under_review: 'На проверке',
-    completed: 'Завершено',
-    cancelled: 'Отменено',
+    received_in_lab:   'Принято в лаб',
+    in_work:           'В работе',
+    under_review:      'На проверке',
+    completed:         'Завершено',
+    cancelled:         'Отменено',
+    annulled:          'Аннулировано',
+    terminated:        'Расторгнуто',
   };
 
   // Определяет следующий статус для каждого текущего
   const statusFlow: Record<string, string> = {
-    awaiting_payment: 'awaiting_payment',
     awaiting_delivery: 'received_in_lab',
-    received_in_lab: 'in_work',
-    in_work: 'under_review',
-    under_review: 'completed',
-    completed: 'completed',
-    cancelled: 'cancelled',
+    received_in_lab:   'in_work',
+    in_work:           'under_review',
+    under_review:      'completed',
+    completed:         'completed',
+    cancelled:         'cancelled',
   };
 
   // Цвета бейджей для каждого статуса
   const statusColors: Record<string, { bg: string; text: string }> = {
-    awaiting_payment: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-    awaiting_delivery: { bg: 'bg-amber-100', text: 'text-amber-700' },
-    received_in_lab: { bg: 'bg-purple-100', text: 'text-purple-700' },
-    in_work: { bg: 'bg-pink-100', text: 'text-pink-700' },
-    under_review: { bg: 'bg-orange-100', text: 'text-orange-700' },
-    completed: { bg: 'bg-green-100', text: 'text-green-700' },
-    cancelled: { bg: 'bg-gray-100', text: 'text-gray-500' },
+    pending_contract:  { bg: 'bg-slate-100',  text: 'text-slate-600' },
+    awaiting_approval: { bg: 'bg-blue-100',   text: 'text-blue-700' },
+    awaiting_director: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+    awaiting_payment:  { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+    awaiting_delivery: { bg: 'bg-amber-100',  text: 'text-amber-700' },
+    received_in_lab:   { bg: 'bg-purple-100', text: 'text-purple-700' },
+    in_work:           { bg: 'bg-pink-100',   text: 'text-pink-700' },
+    under_review:      { bg: 'bg-orange-100', text: 'text-orange-700' },
+    completed:         { bg: 'bg-green-100',  text: 'text-green-700' },
+    cancelled:         { bg: 'bg-gray-100',   text: 'text-gray-500' },
+    annulled:          { bg: 'bg-red-100',    text: 'text-red-600' },
+    terminated:        { bg: 'bg-red-100',    text: 'text-red-600' },
   };
 
   // Загружаем все заявки при монтировании компонента
@@ -213,7 +222,8 @@ export default function Queue() {
                     {/* Действия */}
                     <div className="flex flex-wrap gap-2">
                       {/* Кнопка "Далее →" — скрыта для completed и awaiting_payment */}
-                      {order.status !== 'completed' && order.status !== 'awaiting_payment' && order.status !== 'cancelled' && (
+                      {!['completed', 'awaiting_payment', 'cancelled', 'pending_contract',
+                        'awaiting_approval', 'awaiting_director', 'annulled', 'terminated'].includes(order.status) && (
                         <button
                           onClick={() => handleStatusChange(order.id, order.status)}
                           className="px-3 py-1.5 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-medium rounded-lg border-none cursor-pointer text-xs transition-colors flex items-center gap-1"

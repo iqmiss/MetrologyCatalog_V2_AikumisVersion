@@ -3,20 +3,13 @@
 -- MySQL 8.0+
 -- ============================================
 
-CREATE DATABASE IF NOT EXISTS service_catalog
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
 USE service_catalog;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
--- ============================================
--- SCHEMA
--- ============================================
-
 DROP TABLE IF EXISTS `notifications`;
 DROP TABLE IF EXISTS `results`;
+DROP TABLE IF EXISTS `contract_approvals`;
 DROP TABLE IF EXISTS `contracts`;
 DROP TABLE IF EXISTS `order_items`;
 DROP TABLE IF EXISTS `orders`;
@@ -45,7 +38,8 @@ CREATE TABLE `users` (
   `id` int NOT NULL AUTO_INCREMENT,
   `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `role` enum('client','metrolog','manager','admin') COLLATE utf8mb4_unicode_ci DEFAULT 'client',
+  -- Новые роли: director, financier, approver
+  `role` enum('client','metrolog','manager','director','financier','approver','admin') COLLATE utf8mb4_unicode_ci DEFAULT 'client',
   `company_id` int DEFAULT NULL,
   `lab_id` int DEFAULT NULL,
   `full_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -121,7 +115,21 @@ CREATE TABLE `orders` (
   `client_id` int NOT NULL,
   `service_id` int NOT NULL,
   `lab_id` int NOT NULL,
-  `status` enum('awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed','cancelled') COLLATE utf8mb4_unicode_ci DEFAULT 'awaiting_payment',
+  'payment_comment' varchar(500) DEFAULT NULL,
+  `status` enum(
+    'pending_contract',
+    'awaiting_approval',
+    'awaiting_director',
+    'awaiting_payment',
+    'awaiting_delivery',
+    'received_in_lab',
+    'in_work',
+    'under_review',
+    'completed',
+    'cancelled',
+    'annulled',
+    'terminated'
+  ) COLLATE utf8mb4_unicode_ci DEFAULT 'pending_contract',
   `total_price` decimal(10,2) NOT NULL,
   `submit_date` datetime DEFAULT CURRENT_TIMESTAMP,
   `due_date` date DEFAULT NULL,
@@ -163,26 +171,53 @@ CREATE TABLE `contracts` (
   `order_id` int NOT NULL,
   `contract_number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_path` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  -- Статус договора
+  `status` enum('draft','pending_approval','approved','signed','rejected','annulled','terminated') DEFAULT 'draft',
 
+  -- Подпись клиента
   `client_signed` tinyint(1) DEFAULT '0',
   `client_signed_at` datetime DEFAULT NULL,
   `client_signed_by` int DEFAULT NULL,
 
-  `manager_signed` tinyint(1) DEFAULT '0',
-  `manager_signed_at` datetime DEFAULT NULL,
-  `manager_signed_by` int DEFAULT NULL,
+  -- Подпись директора (вместо менеджера по схеме)
+  `director_signed` tinyint(1) DEFAULT '0',
+  `director_signed_at` datetime DEFAULT NULL,
+  `director_signed_by` int DEFAULT NULL,
+
+  -- Аннулирование/расторжение
+  `annulled_at` datetime DEFAULT NULL,
+  `annulled_by` int DEFAULT NULL,
+  `annulled_reason` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `terminated_at` datetime DEFAULT NULL,
+  `terminated_by` int DEFAULT NULL,
+  `terminated_reason` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
 
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `order_id` (`order_id`),
   UNIQUE KEY `contract_number` (`contract_number`),
-  KEY `client_signed_by` (`client_signed_by`),
-  KEY `manager_signed_by` (`manager_signed_by`),
   KEY `idx_order_id` (`order_id`),
   KEY `idx_contract_number` (`contract_number`),
+  KEY `idx_status` (`status`),
   CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
   CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`client_signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `contracts_ibfk_3` FOREIGN KEY (`manager_signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+  CONSTRAINT `contracts_ibfk_3` FOREIGN KEY (`director_signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Согласования договора — каждый approver оставляет свою отметку
+CREATE TABLE `contract_approvals` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `contract_id` int NOT NULL,
+  `approver_id` int NOT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `comment` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `decided_at` datetime DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_contract_id` (`contract_id`),
+  KEY `idx_approver_id` (`approver_id`),
+  CONSTRAINT `approvals_ibfk_1` FOREIGN KEY (`contract_id`) REFERENCES `contracts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `approvals_ibfk_2` FOREIGN KEY (`approver_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `results` (
@@ -209,7 +244,7 @@ CREATE TABLE `notifications` (
   `user_id` int NOT NULL,
   `order_id` int DEFAULT NULL,
   `message` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `notification_type` enum('order_status','document_ready','reminder') COLLATE utf8mb4_unicode_ci DEFAULT 'order_status',
+  `notification_type` enum('order_status','document_ready','reminder','approval_required') COLLATE utf8mb4_unicode_ci DEFAULT 'order_status',
   `is_read` tinyint(1) DEFAULT '0',
   `read_at` datetime DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -226,54 +261,49 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================
 -- TEST DATA
--- Все пароли: password
 -- ============================================
 
--- Лаборатории
 INSERT INTO `laboratories` (name, address, phone, city) VALUES
 ('Метрологическая лаборатория №1', 'г. Астана, ул. Абая 5', '+77001111111', 'Астана'),
 ('Метрологическая лаборатория №2', 'г. Алматы, ул. Достык 10', '+77002222222', 'Алматы');
 
--- Услуги
 INSERT INTO `services` (name, description, measurement_type, price, duration_days, lab_id, standard) VALUES
 ('Поверка манометра', 'Поверка манометров общего назначения по ГОСТ', 'Манометр', 5000.00, 3, 1, 'ГОСТ 8.610-2012'),
 ('Поверка термометра', 'Поверка термометров лабораторных', 'Термопара', 3500.00, 2, 1, 'ГОСТ 8.016-2021'),
 ('Поверка амперметра', 'Поверка амперметров переменного тока', 'Амперметр', 4500.00, 3, 2, 'ГОСТ 8.497-2009'),
 ('Поверка вольтметра', 'Поверка вольтметров цифровых', 'Вольтметр', 4000.00, 2, 2, 'ГОСТ 8.362-2013');
 
--- Компания
 INSERT INTO `companies` (bin, name, address, phone, email) VALUES
 ('123456789012', 'ТОО Тест Компания', 'г. Астана, ул. Пушкина 1', '+77003333333', 'test@company.kz');
 
--- Пользователи (пароль для всех: password)
+-- Все пароли: password
 INSERT INTO `users` (email, password_hash, role, full_name, phone, company_id, lab_id, is_active) VALUES
-('client@test.kz',        '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client',   'Клиентов Клиент',    '+77004444444', 1,    NULL, 1),
-('metrolog@test.kz',      '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog', 'Метробаев Лог',    '+77005555555', NULL, 1,    1),
-('metrolog2@test.kz',     '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog', 'Логов Метр','+77008888888', NULL, 2,    1),
-('manager@metrology.kz',  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager',  'Менеджерович Менеджер',  '+77006666666', NULL, NULL, 1),
-('admin@metrology.kz',    '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin',    'Админский Стратор',  '+77007777777', NULL, NULL, 1);
+('client@test.kz',        '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client',    'Клиентов Клиент',      '+77004444444', 1,    NULL, 1),
+('metrolog@test.kz',      '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog',  'Метробаев Лог',        '+77005555555', NULL, 1,    1),
+('metrolog2@test.kz',     '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'metrolog',  'Логов Метр',           '+77008888888', NULL, 2,    1),
+('manager@metrology.kz',  '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'manager',   'Менеджерович Менеджер','+77006666666', NULL, NULL, 1),
+('director@metrology.kz', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'director',  'Директоров Директор',  '+77009999999', NULL, NULL, 1),
+('financier@metrology.kz','$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'financier', 'Финансов Финансист',   '+77001234567', NULL, NULL, 1),
+('approver@metrology.kz', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'approver',  'Согласуев Согласующий','+77007654321', NULL, NULL, 1),
+('admin@metrology.kz',    '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin',     'Админский Стратор',    '+77007777777', NULL, NULL, 1);
 
--- Заявки
 INSERT INTO `orders` (order_number, client_id, service_id, lab_id, status, total_price, due_date) VALUES
-('ORD-001', 1, 1, 1, 'completed',        5000.00, '2026-03-15'),
-('ORD-002', 1, 2, 1, 'in_work',          3500.00, '2026-03-25'),
-('ORD-003', 1, 3, 2, 'awaiting_payment', 4500.00, '2026-04-01'),
-('ORD-004', 1, 4, 2, 'awaiting_payment', 4000.00, '2026-04-10');
+('ORD-001', 1, 1, 1, 'completed',         5000.00, '2026-03-15'),
+('ORD-002', 1, 2, 1, 'in_work',           3500.00, '2026-03-25'),
+('ORD-003', 1, 3, 2, 'awaiting_payment',  4500.00, '2026-04-01'),
+('ORD-004', 1, 4, 2, 'pending_contract',  4000.00, '2026-04-10');
 
--- Приборы в заявках
 INSERT INTO `order_items` (order_id, device_type, model, serial_number, quantity, unit_price) VALUES
-(1, 'Манометр',  'МП-100',  'SN-001', 1, 5000.00),
-(2, 'Термометр', 'ТЛ-4',    'SN-002', 1, 3500.00),
-(3, 'Амперметр', 'Э-378',   'SN-003', 1, 4500.00),
-(4, 'Вольтметр', 'В-7-78',  'SN-004', 1, 4000.00);
+(1, 'Манометр',  'МП-100', 'SN-001', 1, 5000.00),
+(2, 'Термометр', 'ТЛ-4',   'SN-002', 1, 3500.00),
+(3, 'Амперметр', 'Э-378',  'SN-003', 1, 4500.00),
+(4, 'Вольтметр', 'В-7-78', 'SN-004', 1, 4000.00);
 
--- Договоры
-INSERT INTO `contracts` (order_id, contract_number, client_signed, manager_signed) VALUES
-(1, 'CNT-001', 1, 1),
-(2, 'CNT-002', 0, 0),
-(3, 'CNT-003', 0, 0),
-(4, 'CNT-004', 0, 0);
+INSERT INTO `contracts` (order_id, contract_number, status, client_signed, director_signed) VALUES
+(1, 'CNT-001', 'signed',  1, 1),
+(2, 'CNT-002', 'draft',   0, 0),
+(3, 'CNT-003', 'signed',  1, 1),
+(4, 'CNT-004', 'draft',   0, 0);
 
--- Результат для завершённой заявки
 INSERT INTO `results` (order_id, result_type, issued_at, metrologist_id, is_signed, signed_at) VALUES
 (1, 'certificate', NOW(), 2, 1, NOW());

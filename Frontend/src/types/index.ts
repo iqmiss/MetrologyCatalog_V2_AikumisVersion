@@ -1,7 +1,7 @@
 export interface User {
   id: number;
   email: string;
-  role: 'client' | 'metrolog' | 'manager' | 'admin';
+  role: 'client' | 'metrolog' | 'manager' | 'director' | 'financier' | 'approver' | 'admin';
   fullName: string;
   phone?: string;
   companyId?: number;
@@ -40,13 +40,27 @@ export interface Service {
   labName?: string;
 }
 
+export type OrderStatus =
+  | 'pending_contract'
+  | 'awaiting_approval'
+  | 'awaiting_director'
+  | 'awaiting_payment'
+  | 'awaiting_delivery'
+  | 'received_in_lab'
+  | 'in_work'
+  | 'under_review'
+  | 'completed'
+  | 'cancelled'
+  | 'annulled'
+  | 'terminated';
+
 export interface Order {
   id: number;
   orderNumber: string;
   clientId: number;
   serviceId: number;
   labId: number;
-  status: 'new' | 'awaiting_payment' | 'awaiting_delivery' | 'received_in_lab' | 'in_work' | 'under_review' | 'completed' | 'cancelled';
+  status: OrderStatus;
   totalPrice: number;
   dueDate?: string;
   metrologistId?: number;
@@ -62,17 +76,37 @@ export interface OrderItem {
   unitPrice: number;
 }
 
+export type ContractStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'signed'
+  | 'rejected'
+  | 'annulled'
+  | 'terminated';
+
 export interface Contract {
   id: number;
   orderId: number;
   contractNumber: string;
   filePath?: string;
+  status: ContractStatus;
+
   clientSigned: boolean;
   clientSignedAt?: string;
   clientSignedBy?: number;
-  managerSigned: boolean;
-  managerSignedAt?: string;
-  managerSignedBy?: number;
+
+  directorSigned: boolean;
+  directorSignedAt?: string;
+  directorSignedBy?: number;
+
+  annulledAt?: string;
+  annulledBy?: number;
+  annulledReason?: string;
+
+  terminatedAt?: string;
+  terminatedBy?: number;
+  terminatedReason?: string;
 }
 
 export interface Result {
@@ -101,7 +135,7 @@ export interface Notification {
   userId: number;
   orderId?: number;
   message: string;
-  notificationType: 'order_status' | 'document_ready' | 'reminder';
+  notificationType: 'order_status' | 'document_ready' | 'reminder' | 'approval_required';
   isRead: boolean;
   readAt?: string;
 }

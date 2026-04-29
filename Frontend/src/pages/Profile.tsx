@@ -57,6 +57,9 @@ export default function Profile() {
     client: 'Клиент',
     metrolog: 'Метролог',
     manager: 'Менеджер',
+    director:  'Директор',
+    financier: 'Финансист',
+    approver:  'Согласующий',
     admin: 'Администратор',
   };
 
@@ -65,6 +68,9 @@ export default function Profile() {
     client: 'bg-blue-100 text-blue-700',
     metrolog: 'bg-green-100 text-green-700',
     manager: 'bg-purple-100 text-purple-700',
+    director:  'bg-indigo-100 text-indigo-700',
+    financier: 'bg-yellow-100 text-yellow-700',
+    approver:  'bg-orange-100 text-orange-700',
     admin: 'bg-red-100 text-red-700',
   };
 

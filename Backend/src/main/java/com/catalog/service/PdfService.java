@@ -3,111 +3,209 @@ package com.catalog.service;
 import com.catalog.models.Order;
 import com.catalog.models.Result;
 import com.catalog.models.Contract;
+import com.catalog.models.User;
 import com.catalog.repository.OrderRepository;
 import com.catalog.repository.ResultRepository;
+import com.catalog.repository.UserRepository;
+import com.catalog.repository.ServiceRepository;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
-import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
 
-// Сервис для генерации PDF документов через библиотеку iText 7
-// Генерирует два типа документов: договор и сертификат/протокол/отчёт
 @Service
+@PropertySource(value = "classpath:executor.properties", encoding = "UTF-8")
 public class PdfService {
 
     private final OrderRepository orderRepository;
     private final ResultRepository resultRepository;
+    private final UserRepository userRepository;
+    private final ServiceRepository serviceRepository;
 
-    public PdfService(OrderRepository orderRepository, ResultRepository resultRepository) {
+    @Value("${executor.name}")
+    private String executorName;
+
+    @Value("${executor.bin}")
+    private String executorBin;
+
+    @Value("${executor.address}")
+    private String executorAddress;
+
+    @Value("${executor.phone}")
+    private String executorPhone;
+
+    @Value("${executor.bank}")
+    private String executorBank;
+
+    public PdfService(OrderRepository orderRepository,
+                      ResultRepository resultRepository,
+                      UserRepository userRepository,
+                      ServiceRepository serviceRepository) {
         this.orderRepository = orderRepository;
         this.resultRepository = resultRepository;
+        this.userRepository = userRepository;
+        this.serviceRepository = serviceRepository;
     }
 
-    // Генерирует PDF договора на основе данных заявки и договора
-    // Вызывается из ContractController.downloadContract()
+    // Загружает шрифт с поддержкой кириллицы через classpath
+    // Шрифт должен лежать в src/main/resources/fonts/FreeSans.ttf
+    private PdfFont loadFont() throws Exception {
+        byte[] fontBytes = getClass().getResourceAsStream("/fonts/FreeSans.ttf").readAllBytes();
+        return PdfFontFactory.createFont(
+            fontBytes,
+            "Identity-H",
+            PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED
+        );
+    }
+
     public byte[] generateContract(Order order, Contract contract) {
-        // ByteArrayOutputStream хранит PDF в памяти вместо записи в файл
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         try (PdfWriter writer = new PdfWriter(baos);
-            PdfDocument pdf = new PdfDocument(writer);
-            Document document = new Document(pdf)) {
+             PdfDocument pdf = new PdfDocument(writer);
+             Document document = new Document(pdf)) {
+
+            // Загружаем шрифт через classpath — работает и локально и на Railway
+            PdfFont font = loadFont();
+            document.setFont(font);
 
             DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
             DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
-            // Заголовок договора
-            document.add(new Paragraph("ДОГОВОР НА ОКАЗАНИЕ МЕТРОЛОГИЧЕСКИХ УСЛУГ")
-                    .setFontSize(16).setBold().setTextAlignment(TextAlignment.CENTER));
+            User client = userRepository.findById(order.getClientId()).orElse(null);
+            com.catalog.models.Service service = serviceRepository.findById(order.getServiceId()).orElse(null);
 
-            document.add(new Paragraph("№ " + contract.getContractNumber())
-                    .setFontSize(12).setTextAlignment(TextAlignment.CENTER));
+            String clientName  = client != null ? client.getFullName() : "—";
+            String clientPhone = client != null && client.getPhone() != null ? client.getPhone() : "—";
+            String clientEmail = client != null ? client.getEmail() : "—";
+            String serviceName = service != null ? service.getName() : "—";
+            String serviceDesc = service != null && service.getDescription() != null ? service.getDescription() : "—";
+            String serviceStd  = service != null && service.getStandard() != null ? service.getStandard() : "—";
 
-            document.add(new Paragraph("Дата: " + java.time.LocalDateTime.now().format(dateFormatter))
+            // ============ ЗАГОЛОВОК ============
+            document.add(p("ДОГОВОР НА ОКАЗАНИЕ МЕТРОЛОГИЧЕСКИХ УСЛУГ", font)
+                    .setFontSize(14).setBold().setTextAlignment(TextAlignment.CENTER));
+            document.add(p("№ " + contract.getContractNumber(), font)
                     .setFontSize(11).setTextAlignment(TextAlignment.CENTER));
-
+            document.add(p("г. Астана,  " + java.time.LocalDate.now().format(dateFormatter), font)
+                    .setFontSize(10).setTextAlignment(TextAlignment.CENTER));
             document.add(new Paragraph(" "));
 
-            // Раздел: стороны договора (исполнитель и заказчик)
-            document.add(new Paragraph("СТОРОНЫ ДОГОВОРА").setFontSize(13).setBold());
+            // ============ 1. СТОРОНЫ ДОГОВОРА ============
+            document.add(p("1. СТОРОНЫ ДОГОВОРА", font).setFontSize(12).setBold());
             document.add(new Paragraph(" "));
 
             Table partiesTable = new Table(UnitValue.createPercentArray(new float[]{50, 50}))
                     .setWidth(UnitValue.createPercentValue(100));
 
-            partiesTable.addCell(new Cell().add(new Paragraph("Исполнитель:").setBold()));
-            partiesTable.addCell(new Cell().add(new Paragraph("Заказчик:")));
-            partiesTable.addCell(new Cell().add(new Paragraph("Метрологическая служба")));
-            partiesTable.addCell(new Cell().add(new Paragraph("Клиент ID: " + order.getClientId())));
+            partiesTable.addCell(cell(p("ИСПОЛНИТЕЛЬ", font).setBold().setTextAlignment(TextAlignment.CENTER)));
+            partiesTable.addCell(cell(p("ЗАКАЗЧИК", font).setBold().setTextAlignment(TextAlignment.CENTER)));
+            partiesTable.addCell(cell(p(executorName + "\nБИН: " + executorBin +
+                    "\nАдрес: " + executorAddress + "\nТел: " + executorPhone, font).setFontSize(9)));
+            partiesTable.addCell(cell(p(clientName + "\nТел: " + clientPhone +
+                    "\nEmail: " + clientEmail, font).setFontSize(9)));
 
             document.add(partiesTable);
             document.add(new Paragraph(" "));
 
-            // Раздел: предмет договора (данные заявки)
-            document.add(new Paragraph("ПРЕДМЕТ ДОГОВОРА").setFontSize(13).setBold());
+            // ============ 2. ПРЕДМЕТ ДОГОВОРА ============
+            document.add(p("2. ПРЕДМЕТ ДОГОВОРА", font).setFontSize(12).setBold());
+            document.add(p("Исполнитель обязуется оказать метрологические услуги, " +
+                    "а Заказчик обязуется принять и оплатить их в соответствии с условиями настоящего договора.", font)
+                    .setFontSize(10));
             document.add(new Paragraph(" "));
 
-            Table orderTable = new Table(UnitValue.createPercentArray(new float[]{40, 60}))
+            Table serviceTable = new Table(UnitValue.createPercentArray(new float[]{40, 60}))
                     .setWidth(UnitValue.createPercentValue(100));
 
-            addRow(orderTable, "Номер заявки:", order.getOrderNumber());
-            addRow(orderTable, "Стоимость услуг:", String.format("%.2f тг", order.getTotalPrice()));
+            addRow(serviceTable, "Вид услуги:",      serviceName,   font);
+            addRow(serviceTable, "Описание:",        serviceDesc,   font);
+            addRow(serviceTable, "Стандарт/ГОСТ:",   serviceStd,    font);
+            addRow(serviceTable, "Номер заявки:",    order.getOrderNumber(), font);
             if (order.getDueDate() != null) {
-                addRow(orderTable, "Срок исполнения:", order.getDueDate().format(dateFormatter));
+                addRow(serviceTable, "Срок исполнения:", order.getDueDate().format(dateFormatter), font);
             }
-            addRow(orderTable, "Статус оплаты:", "Ожидает оплаты");
-
-            document.add(orderTable);
+            document.add(serviceTable);
             document.add(new Paragraph(" "));
 
-            // Раздел: подписи сторон с имитацией ЭЦП
-            document.add(new Paragraph("ПОДПИСИ СТОРОН").setFontSize(13).setBold());
+            // ============ 3. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ ============
+            document.add(p("3. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ", font).setFontSize(12).setBold());
             document.add(new Paragraph(" "));
+
+            Table priceTable = new Table(UnitValue.createPercentArray(new float[]{40, 60}))
+                    .setWidth(UnitValue.createPercentValue(100));
+
+            addRow(priceTable, "Сумма договора:", String.format("%.2f тенге", order.getTotalPrice()), font);
+            addRow(priceTable, "НДС:", "Включён", font);
+            addRow(priceTable, "Порядок оплаты:", "Оплата производится до начала оказания услуг", font);
+
+            document.add(priceTable);
+            document.add(new Paragraph(" "));
+
+            // ============ 4. РЕКВИЗИТЫ СТОРОН ============
+            document.add(p("4. РЕКВИЗИТЫ СТОРОН", font).setFontSize(12).setBold());
+            document.add(new Paragraph(" "));
+
+            Table reqTable = new Table(UnitValue.createPercentArray(new float[]{50, 50}))
+                    .setWidth(UnitValue.createPercentValue(100));
+
+            reqTable.addCell(cell(p("ИСПОЛНИТЕЛЬ", font).setBold().setTextAlignment(TextAlignment.CENTER)));
+            reqTable.addCell(cell(p("ЗАКАЗЧИК", font).setBold().setTextAlignment(TextAlignment.CENTER)));
+            reqTable.addCell(cell(p(executorName + "\nБИН: " + executorBin +
+                    "\nАдрес: " + executorAddress + "\nТел: " + executorPhone +
+                    "\nБанк: " + executorBank, font).setFontSize(9)));
+            reqTable.addCell(cell(p(clientName + "\nТел: " + clientPhone +
+                    "\nEmail: " + clientEmail, font).setFontSize(9)));
+
+            document.add(reqTable);
+            document.add(new Paragraph(" "));
+
+            // ============ 5. ПОДПИСИ СТОРОН ============
+            document.add(p("5. ПОДПИСИ СТОРОН", font).setFontSize(12).setBold());
+            document.add(new Paragraph(" "));
+
+            String clientStatus = contract.isClientSigned()
+                    ? "Подписано ЭЦП\n" + (contract.getClientSignedAt() != null
+                        ? contract.getClientSignedAt().format(dateTimeFormatter) : "")
+                    : "Ожидает подписи";
+
+            String directorStatus = contract.isDirectorSigned()
+                    ? "Подписано ЭЦП\n" + (contract.getDirectorSignedAt() != null
+                        ? contract.getDirectorSignedAt().format(dateTimeFormatter) : "")
+                    : "Ожидает подписи";
+
+            String approvalStatus = switch (contract.getStatus() != null ? contract.getStatus() : "draft") {
+                case "draft"            -> "Черновик";
+                case "pending_approval" -> "На согласовании";
+                case "approved"         -> "Согласовано";
+                case "signed"           -> "Подписан";
+                case "rejected"         -> "Отклонён";
+                case "annulled"         -> "Аннулирован";
+                case "terminated"       -> "Расторгнут";
+                default                 -> "—";
+            };
 
             Table signTable = new Table(UnitValue.createPercentArray(new float[]{50, 50}))
                     .setWidth(UnitValue.createPercentValue(100));
 
-            // Если договор подписан — показываем дату подписания, иначе "Не подписано"
-            String clientStatus = contract.isClientSigned()
-                    ? "✓ Подписано ЭЦП\n" + (contract.getClientSignedAt() != null ? contract.getClientSignedAt().format(dateTimeFormatter) : "")
-                    : "Ожидает подписи";
-
-            String managerStatus = contract.isManagerSigned()
-                    ? "✓ Подписано ЭЦП\n" + (contract.getManagerSignedAt() != null ? contract.getManagerSignedAt().format(dateTimeFormatter) : "")
-                    : "Ожидает подписи";
-
-            signTable.addCell(new Cell().add(new Paragraph("Исполнитель (менеджер):\n" + managerStatus)));
-            signTable.addCell(new Cell().add(new Paragraph("Заказчик (клиент):\n" + clientStatus)));
+            signTable.addCell(cell(p("Директор:\n" + directorStatus + "\n\n" + executorName, font).setFontSize(9)));
+            signTable.addCell(cell(p("Заказчик:\n" + clientStatus + "\n\n" + clientName, font).setFontSize(9)));
 
             document.add(signTable);
+            document.add(new Paragraph(" "));
+            document.add(p("Статус договора: " + approvalStatus, font).setFontSize(10));
 
         } catch (Exception e) {
             throw new RuntimeException("Ошибка генерации договора: " + e.getMessage(), e);
@@ -116,93 +214,68 @@ public class PdfService {
         return baos.toByteArray();
     }
 
-    // Генерирует PDF результата поверки (сертификат, протокол или отчёт)
-    // Тип документа определяется полем result_type в таблице results
-    // Вызывается из PdfController.downloadCertificate()
     public byte[] generateCertificate(int orderId) {
-        // Получаем данные заявки и результата из БД
         Order order = orderRepository.findById(orderId).orElse(null);
         if (order == null) throw new RuntimeException("Order not found: " + orderId);
 
         Result result = resultRepository.findByOrderId(orderId).orElse(null);
-
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         try (PdfWriter writer = new PdfWriter(baos);
              PdfDocument pdf = new PdfDocument(writer);
              Document document = new Document(pdf)) {
 
+            PdfFont font = loadFont();
+            document.setFont(font);
+
             DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
             DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
-            // Заголовок — название зависит от типа результата (Сертификат/Протокол/Отчёт)
             String docTitle = getDocumentTitle(result);
-            document.add(new Paragraph(docTitle)
-                    .setFontSize(18)
-                    .setBold()
-                    .setTextAlignment(TextAlignment.CENTER));
-
-            document.add(new Paragraph("№ " + order.getOrderNumber())
-                    .setFontSize(12)
-                    .setTextAlignment(TextAlignment.CENTER));
-
+            document.add(p(docTitle, font).setFontSize(18).setBold().setTextAlignment(TextAlignment.CENTER));
+            document.add(p("№ " + order.getOrderNumber(), font).setFontSize(12).setTextAlignment(TextAlignment.CENTER));
             document.add(new Paragraph(" "));
 
-            // Раздел: основные данные заявки
             Table infoTable = new Table(UnitValue.createPercentArray(new float[]{40, 60}))
                     .setWidth(UnitValue.createPercentValue(100));
 
-            addRow(infoTable, "Номер заказа:", order.getOrderNumber());
-            addRow(infoTable, "Статус:", order.getStatus());
-            addRow(infoTable, "Стоимость:", String.format("%.2f тг", order.getTotalPrice()));
-
+            addRow(infoTable, "Номер заказа:", order.getOrderNumber(), font);
+            addRow(infoTable, "Статус:", order.getStatus(), font);
+            addRow(infoTable, "Стоимость:", String.format("%.2f тг", order.getTotalPrice()), font);
             if (order.getDueDate() != null) {
-                addRow(infoTable, "Срок исполнения:", order.getDueDate().format(dateFormatter));
+                addRow(infoTable, "Срок исполнения:", order.getDueDate().format(dateFormatter), font);
             }
-
             document.add(infoTable);
             document.add(new Paragraph(" "));
 
-            // Раздел: данные результата поверки
             if (result != null) {
-                document.add(new Paragraph("Результат поверки")
-                        .setFontSize(14)
-                        .setBold());
+                document.add(p("Результат поверки", font).setFontSize(14).setBold());
 
                 Table resultTable = new Table(UnitValue.createPercentArray(new float[]{40, 60}))
                         .setWidth(UnitValue.createPercentValue(100));
 
-                addRow(resultTable, "Тип документа:", getDocumentTitle(result));
-                addRow(resultTable, "Подписан:", result.isSigned() ? "Да" : "Нет");
-
+                addRow(resultTable, "Тип документа:", getDocumentTitle(result), font);
+                addRow(resultTable, "Подписан:", result.isSigned() ? "Да" : "Нет", font);
                 if (result.getIssuedAt() != null) {
-                    addRow(resultTable, "Дата выдачи:", result.getIssuedAt().format(dateTimeFormatter));
+                    addRow(resultTable, "Дата выдачи:", result.getIssuedAt().format(dateTimeFormatter), font);
                 }
                 if (result.isSigned() && result.getSignedAt() != null) {
-                    addRow(resultTable, "Дата подписания:", result.getSignedAt().format(dateTimeFormatter));
+                    addRow(resultTable, "Дата подписания:", result.getSignedAt().format(dateTimeFormatter), font);
                 }
-
                 document.add(resultTable);
             } else {
-                // Если результат ещё не добавлен метрологом
-                document.add(new Paragraph("Результат поверки ещё не добавлен.")
-                        .setItalic()
-                        .setFontColor(com.itextpdf.kernel.colors.ColorConstants.GRAY));
+                document.add(p("Результат поверки ещё не добавлен.", font)
+                        .setItalic().setFontColor(com.itextpdf.kernel.colors.ColorConstants.GRAY));
             }
 
             document.add(new Paragraph(" "));
-
-            // Раздел: подписи сторон
-            document.add(new Paragraph("Подписи сторон")
-                    .setFontSize(14)
-                    .setBold());
+            document.add(p("Подписи сторон", font).setFontSize(14).setBold());
 
             Table signTable = new Table(UnitValue.createPercentArray(new float[]{50, 50}))
                     .setWidth(UnitValue.createPercentValue(100));
 
-            signTable.addCell(new Cell().add(new Paragraph("Метролог: _______________")));
-            signTable.addCell(new Cell().add(new Paragraph("Клиент: _______________")));
-
+            signTable.addCell(cell(p("Метролог: _______________", font)));
+            signTable.addCell(cell(p("Клиент: _______________", font)));
             document.add(signTable);
 
         } catch (Exception e) {
@@ -212,15 +285,22 @@ public class PdfService {
         return baos.toByteArray();
     }
 
-    // Вспомогательный метод для добавления строки в таблицу PDF
-    // label — жирный заголовок колонки, value — значение
-    private void addRow(Table table, String label, String value) {
-        table.addCell(new Cell().add(new Paragraph(label).setBold()));
-        table.addCell(new Cell().add(new Paragraph(value != null ? value : "—")));
+    // Вспомогательный метод — создаёт Paragraph с нужным шрифтом
+    private Paragraph p(String text, PdfFont font) {
+        return new Paragraph(text).setFont(font);
     }
 
-    // Определяет название документа по типу результата
-    // certificate → Сертификат, protocol → Протокол, report → Отчёт
+    // Вспомогательный метод — оборачивает Paragraph в Cell
+    private Cell cell(Paragraph paragraph) {
+        return new Cell().add(paragraph);
+    }
+
+    // Вспомогательный метод — добавляет строку в таблицу с шрифтом
+    private void addRow(Table table, String label, String value, PdfFont font) {
+        table.addCell(cell(p(label, font).setBold()));
+        table.addCell(cell(p(value != null ? value : "—", font)));
+    }
+
     private String getDocumentTitle(Result result) {
         if (result == null) return "Документ";
         return switch (result.getResultType()) {

@@ -1,22 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import api, { serviceApi, orderApi } from '../services/api';
-import type { Service, Laboratory } from '../types';
+import api, { serviceApi, orderApi, userApi } from '../services/api';
+import type { Service, Laboratory, User } from '../types';
 
-// Страница создания новой заявки на метрологические услуги
-// Может получить предвыбранную услугу через location.state от страницы каталога
 export default function CreateOrder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
   const [services, setServices] = useState<Service[]>([]);
   const [laboratories, setLaboratories] = useState<Laboratory[]>([]);
+  const [clients, setClients] = useState<User[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Если пришли с каталога — serviceId уже заполнен через location.state
   const [formData, setFormData] = useState({
     serviceId: location.state?.serviceId?.toString() || '',
     labId: '',
@@ -25,9 +24,9 @@ export default function CreateOrder() {
     serialNumber: '',
     quantity: '1',
     dueDate: '',
+    clientComment: '',
   });
 
-  // Загружаем услуги и лаборатории параллельно при монтировании
   useEffect(() => {
     fetchData();
   }, []);
@@ -35,13 +34,19 @@ export default function CreateOrder() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      // Promise.all выполняет оба запроса одновременно для ускорения загрузки
-      const [servicesRes, labsRes] = await Promise.all([
+      const requests: Promise<any>[] = [
         serviceApi.getAll(),
-        api.get('/laboratories')
-      ]);
-      setServices(servicesRes.data);
-      setLaboratories(labsRes.data);
+        api.get('/laboratories'),
+      ];
+      if (user?.role === 'manager') {
+        requests.push(userApi.getClients());
+      }
+      const results = await Promise.all(requests);
+      setServices(results[0].data);
+      setLaboratories(results[1].data);
+      if (user?.role === 'manager' && results[2]) {
+        setClients(results[2].data);
+      }
     } catch {
       setError('Ошибка при загрузке данных');
     } finally {
@@ -49,8 +54,7 @@ export default function CreateOrder() {
     }
   };
 
-  // Универсальный обработчик изменения полей формы
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -60,26 +64,27 @@ export default function CreateOrder() {
     setError('');
     setSuccess('');
 
-    // Валидация обязательных полей на фронтенде
+    if (user?.role === 'manager' && !selectedClientId) {
+      setError('Выберите клиента');
+      return;
+    }
+
     if (!formData.serviceId || !formData.labId || !formData.deviceType || !formData.serialNumber || !formData.dueDate) {
       setError('Заполните все обязательные поля');
       return;
     }
 
     try {
-      // Находим выбранную услугу для расчёта стоимости
       const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
       if (!selectedService) { setError('Услуга не найдена'); return; }
 
-      // Формируем payload для бэкенда
-      // totalPrice = цена услуги × количество приборов
       const orderPayload = {
-        clientId: user?.id,
+        clientId: user?.role === 'manager' ? selectedClientId : user?.id,
         serviceId: parseInt(formData.serviceId),
         labId: parseInt(formData.labId),
-        status: 'new',
         totalPrice: selectedService.price * parseInt(formData.quantity),
         dueDate: formData.dueDate,
+        clientComment: formData.clientComment || null,
         orderItems: [{
           deviceType: formData.deviceType,
           model: formData.model,
@@ -89,18 +94,14 @@ export default function CreateOrder() {
         }],
       };
 
-      // Бэкенд автоматически создаёт договор после сохранения заявки
       await orderApi.create(orderPayload);
       setSuccess('Заявка создана успешно!');
-
-      // Перенаправляем в MyOrders через 1.5 секунды
-      setTimeout(() => navigate('/my-orders'), 1500);
+      setTimeout(() => navigate('/orders'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при создании заявки');
     }
   };
 
-  // Выбранная услуга — для отображения деталей и расчёта стоимости
   const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
   const totalPrice = selectedService ? selectedService.price * parseInt(formData.quantity || '1') : 0;
 
@@ -124,7 +125,6 @@ export default function CreateOrder() {
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
 
-        {/* Заголовок */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[#0A2E5C]" style={{ margin: 0, fontSize: '1.75rem' }}>
             Новая заявка
@@ -134,7 +134,6 @@ export default function CreateOrder() {
           </p>
         </div>
 
-        {/* Уведомления */}
         {error && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-red-600 text-sm">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -154,7 +153,32 @@ export default function CreateOrder() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
-          {/* Секция: выбор услуги из каталога */}
+          {/* Выбор клиента — только для менеджера */}
+          {user?.role === 'manager' && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+              <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
+                Клиент
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Выберите клиента *</label>
+                <select
+                  value={selectedClientId || ''}
+                  onChange={e => setSelectedClientId(parseInt(e.target.value))}
+                  className={selectClass}
+                  style={{ fontFamily: 'inherit', marginBottom: 0 }}
+                >
+                  <option value="">— Выберите клиента —</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.fullName} ({c.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Выбор услуги */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Выберите услугу
@@ -171,8 +195,6 @@ export default function CreateOrder() {
                   ))}
                 </select>
               </div>
-
-              {/* Показываем описание выбранной услуги */}
               {selectedService && (
                 <div className="bg-[#00B2FF]/5 border-l-4 border-[#00B2FF] rounded-lg p-4">
                   <p className="text-sm text-gray-600 mb-1" style={{ margin: '0 0 4px' }}>
@@ -188,7 +210,7 @@ export default function CreateOrder() {
             </div>
           </div>
 
-          {/* Секция: данные прибора для поверки */}
+          {/* Информация о приборе */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Информация о приборе
@@ -221,7 +243,7 @@ export default function CreateOrder() {
             </div>
           </div>
 
-          {/* Секция: выбор лаборатории и даты */}
+          {/* Место и дата */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Место и дата
@@ -229,7 +251,6 @@ export default function CreateOrder() {
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Лаборатория *</label>
-                {/* Лаборатории загружаются с бэкенда из таблицы laboratories */}
                 <select name="labId" value={formData.labId} onChange={handleChange} required className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
                   <option value="">— Выберите лабораторию —</option>
                   {laboratories.map(lab => (
@@ -246,7 +267,28 @@ export default function CreateOrder() {
             </div>
           </div>
 
-          {/* Секция: итоговая стоимость — рассчитывается автоматически */}
+          {/* Комментарий */}
+          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
+              Комментарий
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Дополнительные пожелания (необязательно)
+              </label>
+              <textarea
+                name="clientComment"
+                value={formData.clientComment}
+                onChange={handleChange}
+                placeholder="Опишите особенности приборов, срочность, дополнительные требования..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white resize-none"
+                style={{ fontFamily: 'inherit', marginBottom: 0 }}
+              />
+            </div>
+          </div>
+
+          {/* Итого */}
           {selectedService && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
               <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>

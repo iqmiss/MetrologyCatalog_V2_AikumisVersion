@@ -22,7 +22,7 @@ public class Order {
     @Column(name = "lab_id", nullable = false)
     private int labId;
 
-    @Column(columnDefinition = "ENUM('new','awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed', 'cancelled')")
+    @Column(columnDefinition = "ENUM('pending_contract','awaiting_approval','awaiting_director','awaiting_payment','awaiting_delivery','received_in_lab','in_work','under_review','completed','cancelled','annulled','terminated')")
     private String status;
 
     @Column(name = "total_price", nullable = false, columnDefinition = "DECIMAL(10,2)")
@@ -34,6 +34,15 @@ public class Order {
     @Column(name = "metrologist_id")
     private Integer metrologistId;
 
+    @Column(name = "payment_comment")
+    private String paymentComment;
+
+    @Column(name = "client_comment")
+    private String clientComment;
+
+    @Column(name = "invoice_amount", columnDefinition = "DECIMAL(10,2)")
+    private Double invoiceAmount;
+
     public Order() {}
 
     public Order(String orderNumber, int clientId, int serviceId, int labId, double totalPrice) {
@@ -42,7 +51,7 @@ public class Order {
         this.serviceId = serviceId;
         this.labId = labId;
         this.totalPrice = totalPrice;
-        this.status = "new";
+        this.status = "pending_contract";
     }
 
     public int getId() { return id; }
@@ -56,7 +65,7 @@ public class Order {
 
     public int getServiceId() { return serviceId; }
     public void setServiceId(int serviceId) { this.serviceId = serviceId; }
-
+    
     public int getLabId() { return labId; }
     public void setLabId(int labId) { this.labId = labId; }
 
@@ -71,4 +80,13 @@ public class Order {
 
     public Integer getMetrologistId() { return metrologistId; }
     public void setMetrologistId(Integer metrologistId) { this.metrologistId = metrologistId; }
+
+    public String getPaymentComment() { return paymentComment; }
+    public void setPaymentComment(String paymentComment) { this.paymentComment = paymentComment; }
+
+    public String getClientComment() { return clientComment; }
+    public void setClientComment(String clientComment) { this.clientComment = clientComment; }
+
+    public Double getInvoiceAmount() { return invoiceAmount; }
+    public void setInvoiceAmount(Double invoiceAmount) { this.invoiceAmount = invoiceAmount; }
 }

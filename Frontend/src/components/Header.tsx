@@ -2,36 +2,27 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 
-// Компонент шапки и боковой навигации
-// Меню адаптируется под роль пользователя — каждая роль видит только свои разделы
 export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
-
-  // Состояние открытия/закрытия бокового меню (sidebar)
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
-    // Очищаем токен и данные пользователя из хранилища и перенаправляем на логин
     logout();
     navigate('/login');
   };
 
-  // Навигация с автоматическим закрытием бокового меню
   const navigateTo = (path: string) => {
     navigate(path);
     setSidebarOpen(false);
   };
 
-  // Активный пункт меню — подсвечивается текущий маршрут
   const isActive = (path: string) => location.pathname === path;
 
   const navItemClass = (path: string) =>
     `w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer border-none flex items-center gap-3 ${
-      isActive(path)
-        ? 'bg-[#0A2E5C] text-white'
-        : 'text-gray-600'
+      isActive(path) ? 'bg-[#0A2E5C] text-white' : 'text-gray-600'
     }`;
 
   const navItemStyle = (path: string): React.CSSProperties =>
@@ -41,10 +32,8 @@ export default function Header() {
 
   return (
     <>
-      {/* Верхняя панель */}
       <header className="bg-white border-b border-gray-100 px-4 h-[60px] flex items-center justify-between sticky top-0 z-50 shadow-sm">
         <div className="flex items-center gap-3">
-          {/* Кнопка открытия бокового меню — видна только на мобильных */}
           <button
             className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 border-none cursor-pointer"
             style={{ marginBottom: 0, background: 'none' }}
@@ -54,8 +43,6 @@ export default function Header() {
               <path d="M4 5h16M4 12h16M4 19h16" />
             </svg>
           </button>
-
-          {/* Логотип */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigateTo('/')}>
             <div className="w-8 h-8 bg-gradient-to-br from-[#0A2E5C] to-[#00B2FF] rounded-lg flex items-center justify-center">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -67,7 +54,6 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Правая часть — имя пользователя и кнопка выхода */}
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2">
             <div className="w-8 h-8 bg-[#00B2FF] rounded-full flex items-center justify-center text-white text-sm font-bold">
@@ -93,12 +79,10 @@ export default function Header() {
         </div>
       </header>
 
-      {/* Боковое меню */}
       <aside className={`fixed left-0 top-[60px] h-[calc(100vh-60px)] w-[240px] bg-white border-r border-gray-100 z-40 transition-transform duration-300 overflow-y-auto
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <nav className="p-4 flex flex-col gap-1">
 
-          {/* Закрыть кнопка — только мобильная */}
           <div className="flex items-center justify-between mb-4 md:hidden">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Меню</span>
             <button
@@ -112,7 +96,7 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Общие разделы — доступны всем авторизованным пользователям */}
+          {/* Общее — все роли */}
           <div className="mb-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
               Общее
@@ -131,7 +115,7 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Разделы для клиента — подача и просмотр заявок */}
+          {/* Клиент */}
           {user?.role === 'client' && (
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
@@ -152,7 +136,7 @@ export default function Header() {
             </div>
           )}
 
-          {/* Разделы для метролога — очередь заявок */}
+          {/* Метролог */}
           {user?.role === 'metrolog' && (
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
@@ -167,7 +151,7 @@ export default function Header() {
             </div>
           )}
 
-          {/* Разделы для менеджера — очередь, дашборд и отчёты */}
+          {/* Менеджер */}
           {user?.role === 'manager' && (
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
@@ -178,6 +162,12 @@ export default function Header() {
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
                 </svg>
                 Все заявки
+              </button>
+              <button onClick={() => navigateTo('/create-order')} className={navItemClass('/create-order')} style={navItemStyle('/create-order')}>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
+                </svg>
+                Создать заявку
               </button>
               <button onClick={() => navigateTo('/dashboard')} className={navItemClass('/dashboard')} style={navItemStyle('/dashboard')}>
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -194,7 +184,53 @@ export default function Header() {
             </div>
           )}
 
-          {/* Разделы для администратора — управление пользователями */}
+          {/* Согласующий */}
+          {user?.role === 'approver' && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
+                Согласование
+              </p>
+              <button onClick={() => navigateTo('/approver')} className={navItemClass('/approver')} style={navItemStyle('/approver')}>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+                Согласование
+              </button>
+            </div>
+          )}
+
+          {/* Директор */}
+          {user?.role === 'director' && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
+                Подписание
+              </p>
+              <button onClick={() => navigateTo('/director')} className={navItemClass('/director')} style={navItemStyle('/director')}>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Подписание договоров
+              </button>
+            </div>
+          )}
+
+          {/* Финансист */}
+          {user?.role === 'financier' && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
+                Финансы
+              </p>
+              <button onClick={() => navigateTo('/financier')} className={navItemClass('/financier')} style={navItemStyle('/financier')}>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>
+                </svg>
+                Счета и оплаты
+              </button>
+            </div>
+          )}
+
+          {/* Администратор */}
           {user?.role === 'admin' && (
             <div className="mb-4">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-3 mb-2" style={{ margin: '0 0 8px' }}>
@@ -211,7 +247,6 @@ export default function Header() {
         </nav>
       </aside>
 
-      {/* Затемнение фона при открытом боковом меню на мобильных */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-30 md:hidden"
