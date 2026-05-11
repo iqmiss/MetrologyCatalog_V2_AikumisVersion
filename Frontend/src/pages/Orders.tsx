@@ -950,7 +950,7 @@ export default function Orders() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Причина возврата</label>
               <textarea value={returnComment} onChange={e => setReturnComment(e.target.value)} rows={4}
                 placeholder="Опишите что нужно исправить или дополнить..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/10 transition-all resize-none"
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm bg-white outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/10 transition-all resize-none"
                 style={{ fontFamily: 'inherit', marginBottom: 0 }} autoFocus />
               <p className="text-xs text-gray-400 mt-1.5" style={{ margin: '6px 0 0' }}>Клиент увидит этот комментарий</p>
             </div>
