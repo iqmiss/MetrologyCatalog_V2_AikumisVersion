@@ -178,7 +178,6 @@ CREATE TABLE `contracts` (
   `contract_file_name`    varchar(255) NULL,
   `file_path`             varchar(500) DEFAULT NULL,
   `status`                enum('draft','pending_approval','approved','signed','rejected','annulled','terminated') DEFAULT 'draft',
-  -- Параллельная тройка
   `director_signed`       tinyint(1)   DEFAULT '0',
   `director_signed_at`    datetime     DEFAULT NULL,
   `director_signed_by`    int          DEFAULT NULL,
@@ -188,18 +187,14 @@ CREATE TABLE `contracts` (
   `financier_signed`      tinyint(1)   NOT NULL DEFAULT '0',
   `financier_signed_at`   datetime     DEFAULT NULL,
   `financier_signed_by`   int          DEFAULT NULL,
-  -- Клиент
   `client_signed`         tinyint(1)   DEFAULT '0',
   `client_signed_at`      datetime     DEFAULT NULL,
   `client_signed_by`      int          DEFAULT NULL,
-  -- Ген.директор (финальная подпись)
   `gen_director_signed`   tinyint(1)   NOT NULL DEFAULT '0',
   `gen_director_signed_at` datetime    DEFAULT NULL,
   `gen_director_signed_by` int         DEFAULT NULL,
-  -- Отклонение
   `rejected_by_role`      varchar(50)  DEFAULT NULL,
   `rejected_reason`       text         DEFAULT NULL,
-  -- Аннулирование / расторжение
   `annulled_at`           datetime     DEFAULT NULL,
   `annulled_by`           int          DEFAULT NULL,
   `annulled_reason`       text         DEFAULT NULL,
