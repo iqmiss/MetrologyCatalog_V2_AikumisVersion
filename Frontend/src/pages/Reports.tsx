@@ -52,7 +52,7 @@ export default function Reports() {
   // Считаем выручку только по завершённым заявкам из отфильтрованного списка
   const totalRevenue = filteredOrders
     .filter(o => o.status === 'completed')
-    .reduce((sum, o) => sum + o.totalPrice, 0);
+    .reduce((sum, o) => sum + (o.price ?? 0), 0);
 
   // Форматируем дату в читаемый вид для русской локали
   const formatDate = (dateString?: string) =>
@@ -145,7 +145,9 @@ export default function Reports() {
                         {statusLabels[order.status] || order.status}
                       </span>
                     </div>
-                    <div className="text-sm font-semibold text-[#0A2E5C]">{order.totalPrice.toLocaleString()} ₸</div>
+                    <div className="text-sm font-semibold text-[#0A2E5C]">
+                      {order.price != null ? `${order.price.toLocaleString()} ₸` : '—'}
+                    </div>
                     <div className="text-sm text-gray-500">{formatDate(order.dueDate)}</div>
                   </div>
                 );
