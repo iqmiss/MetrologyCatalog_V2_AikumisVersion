@@ -1,6 +1,7 @@
 package com.catalog.service;
 
 import com.catalog.models.Notification;
+import com.catalog.models.User;
 import com.catalog.repository.NotificationRepository;
 import com.catalog.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -193,7 +194,6 @@ public class NotificationService {
             emailService.sendContractReady(client.getEmail(), client.getFullName(), orderNumber));
     }
 
-    /** Клиент подписал → уведомляем ген.директора что его очередь */
     public void notifyGenDirectorForSigning(Integer orderId, String orderNumber) {
         userRepository.findByRole("gen_director").forEach(u ->
             create(u.getId(), orderId,
@@ -203,7 +203,6 @@ public class NotificationService {
     }
 
 
-    /** Ген.директор подписал → финансист формирует счёт */
     public void notifyFinanciersContractSigned(Integer orderId, String orderNumber) {
         userRepository.findByRole("financier").forEach(u ->
             create(u.getId(), orderId,
@@ -212,7 +211,6 @@ public class NotificationService {
         );
     }
 
-    /** Финансист сформировал счёт → менеджер отправляет клиенту */
     public void notifyManagerInvoiceReady(Integer orderId, String orderNumber) {
         userRepository.findByRole("manager").forEach(u ->
             create(u.getId(), orderId,
@@ -221,7 +219,6 @@ public class NotificationService {
         );
     }
 
-    /** Финансист подтвердил оплату → менеджер уведомляет руководителя */
     public void notifyManagerPaymentConfirmed(Integer orderId, String orderNumber) {
         userRepository.findByRole("manager").forEach(u ->
             create(u.getId(), orderId,
@@ -230,7 +227,6 @@ public class NotificationService {
         );
     }
 
-    /** Менеджер уведомляет руководителя — направить на исполнение */
     public void notifyDirectorToAssign(Integer orderId, String orderNumber) {
         userRepository.findByRole("director").forEach(u ->
             create(u.getId(), orderId,

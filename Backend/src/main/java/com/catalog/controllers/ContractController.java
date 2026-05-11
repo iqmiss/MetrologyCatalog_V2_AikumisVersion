@@ -16,15 +16,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Map;
 
-/**
- * Флоу по схеме:
- * 1. Менеджер загружает файл договора → pending_approval
- * 2. Тройка (director + approver + financier) подписывает параллельно
- * 3. Клиент подписывает
- * 4. Ген.директор подписывает → регистрационный номер → awaiting_payment
- * 5. Финансист формирует счёт → передаёт менеджеру
- * 6. Менеджер отправляет клиенту
- */
 @RestController
 @RequestMapping("/api/contracts")
 @CrossOrigin(origins = "http://localhost:5173")
@@ -52,7 +43,6 @@ public class ContractController {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
             if (contract == null)
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            // Не возвращаем Base64 файл в общем ответе — только метаданные
             Contract response = copyWithoutFile(contract);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -80,14 +70,12 @@ public class ContractController {
             Contract contract = contractRepository.findByOrderId(orderId)
                 .orElse(new Contract(orderId, "CNT-" + System.currentTimeMillis()));
 
-            // Если уже на согласовании или подписан — не трогаем
-            if ("pending_approval".equals(contract.getStatus()) || "signed".equals(contract.getStatus()))
+                    if ("pending_approval".equals(contract.getStatus()) || "signed".equals(contract.getStatus()))
                 return ResponseEntity.ok(copyWithoutFile(contract));
 
             contract.setContractFile(request.getFileData());
             contract.setContractFileName(request.getFileName());
             contract.setStatus("pending_approval");
-            // Сбрасываем все подписи при повторной загрузке
             contract.setApproverSigned(false); contract.setApproverSignedAt(null); contract.setApproverSignedBy(null);
             contract.setFinancierSigned(false); contract.setFinancierSignedAt(null); contract.setFinancierSignedBy(null);
             contract.setDirectorSigned(false); contract.setDirectorSignedAt(null); contract.setDirectorSignedBy(null);
@@ -286,14 +274,11 @@ public class ContractController {
             contract.setGenDirectorSignedBy(req.userId);
             contract.setStatus("signed");
 
-            // Присваиваем регистрационный номер
-            String regNumber = "РЕГ-" + DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDateTime.now())
+                    String regNumber = "РЕГ-" + DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDateTime.now())
                 + "-" + orderId;
             contract.setRegistrationNumber(regNumber);
             contractRepository.save(contract);
 
-            // Договор полностью подписан → awaiting_payment
-            // Уведомляем финансиста — нужно сформировать счёт и передать менеджеру
             Order order = orderRepository.findById(orderId).orElse(null);
             if (order != null) {
                 order.setStatus("awaiting_payment");
@@ -334,7 +319,6 @@ public class ContractController {
         }
     }
 
-    // Legacy — для совместимости
     @PutMapping("/{orderId}/approve")
     public ResponseEntity<?> approveContract(@PathVariable int orderId, @RequestBody SignRequest req) {
         return signByApprover(orderId, req);
@@ -385,7 +369,6 @@ public class ContractController {
             if (contract == null || order == null)
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
 
-            // Если есть загруженный файл — отдаём его
             if (contract.getContractFile() != null) {
                 byte[] fileBytes = Base64.getDecoder().decode(contract.getContractFile());
                 String fileName = contract.getContractFileName() != null
@@ -397,7 +380,6 @@ public class ContractController {
                 return ResponseEntity.ok().headers(headers).body(fileBytes);
             }
 
-            // Иначе генерируем PDF
             byte[] pdfBytes = pdfService.generateContract(order, contract);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
@@ -420,7 +402,6 @@ public class ContractController {
         }
     }
 
-    // Возвращает копию договора без Base64 файла чтобы не гонять его по сети в каждом запросе
     private Contract copyWithoutFile(Contract c) {
         Contract copy = new Contract();
         copy.setId(c.getId());

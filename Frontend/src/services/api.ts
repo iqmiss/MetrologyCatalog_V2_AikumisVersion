@@ -82,30 +82,23 @@ export const pdfApi = {
 
 export const contractApi = {
   getByOrderId: (orderId: number) => api.get(`/contracts/${orderId}`),
-  // Менеджер загружает файл договора
   uploadContract: (orderId: number, fileData: string, fileName: string) =>
     api.post(`/contracts/${orderId}`, { fileData, fileName }),
   submit: (orderId: number) => api.put(`/contracts/${orderId}/submit`),
-  // Скачать загруженный файл договора
   downloadFile: (orderId: number) =>
     api.get(`/contracts/${orderId}/file`, { responseType: 'blob' }),
-  // Параллельная тройка
   signByApprover: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/approver`, { userId }),
   signByFinancier: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/financier`, { userId }),
   signByDirector: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/director`, { userId }),
-  // Клиент
   signByClient: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/client`, { userId }),
-  // Ген.директор — последний
   signByGenDirector: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/gen_director`, { userId }),
-  // Отклонение
   reject: (orderId: number, userId: number, reason: string, role: string) =>
     api.put(`/contracts/${orderId}/reject`, { userId, reason, role }),
-  // Аннулирование / расторжение
   annul: (orderId: number, userId: number, reason: string) =>
     api.put(`/contracts/${orderId}/annul`, { userId, reason }),
   terminate: (orderId: number, userId: number, reason: string) =>

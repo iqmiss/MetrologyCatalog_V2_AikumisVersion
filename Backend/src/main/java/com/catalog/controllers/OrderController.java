@@ -388,7 +388,6 @@ public class OrderController {
             order.setPrice(request.getPrice());
             orderRepository.save(order);
 
-            // По схеме: финансист передаёт счёт менеджеру, менеджер отправляет клиенту
             notificationService.notifyManagerInvoiceReady(order.getId(), order.getOrderNumber());
 
             return ResponseEntity.ok(order);
@@ -409,7 +408,6 @@ public class OrderController {
             if (request.getInvoiceAmount() != null) order.setPrice(request.getInvoiceAmount());
 
             orderRepository.save(order);
-            // По схеме: финансист уведомляет менеджера, менеджер вручную уведомляет руководителя
             notificationService.notifyManagerPaymentConfirmed(order.getId(), order.getOrderNumber());
             return ResponseEntity.ok(order);
         } catch (Exception e) {
@@ -472,7 +470,6 @@ public class OrderController {
         return response;
     }
 
-    // ─── Request classes ─────────────────────────────────────────────────────
 
     public static class CreateOrderRequest {
         public Integer clientId, serviceId, labId;

@@ -34,7 +34,6 @@ public class Contract {
     @Column(columnDefinition = "ENUM('draft','pending_approval','approved','signed','rejected','annulled','terminated')")
     private String status;
 
-    // Параллельная тройка(руководитель, согласующий, финансист)
     @Column(name = "director_signed")
     private boolean directorSigned;
     @Column(name = "director_signed_at")
@@ -56,7 +55,6 @@ public class Contract {
     @Column(name = "financier_signed_by")
     private Integer financierSignedBy;
 
-    // Клиент
     @Column(name = "client_signed")
     private boolean clientSigned;
     @Column(name = "client_signed_at")
@@ -64,7 +62,6 @@ public class Contract {
     @Column(name = "client_signed_by")
     private Integer clientSignedBy;
 
-    // Ген.директор (финальная подпись)
     @Column(name = "gen_director_signed")
     private boolean genDirectorSigned;
     @Column(name = "gen_director_signed_at")
@@ -94,7 +91,6 @@ public class Contract {
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    // Тройка(руководитель, согласующий, финансист) подписала
     public boolean isTrioSigned() {
         return directorSigned && approverSigned && financierSigned;
     }
