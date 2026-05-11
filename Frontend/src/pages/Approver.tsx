@@ -42,7 +42,7 @@ export default function Approver() {
       setDownloadingId(orderId);
       const token = localStorage.getItem('token');
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
-      const response = await fetch(`${baseUrl}/contracts/${orderId}/download`, {
+      const response = await fetch(`${baseUrl}/contracts/${orderId}/file`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error();
@@ -193,7 +193,7 @@ export default function Approver() {
                         value={rejectReason[order.id] || ''}
                         onChange={e => setRejectReason(prev => ({ ...prev, [order.id]: e.target.value }))}
                         placeholder="Укажите причину отклонения..."
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-all resize-none mb-2"
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-all resize-none mb-2"
                         rows={3}
                         style={{ fontFamily: 'inherit', marginBottom: '8px' }}
                       />

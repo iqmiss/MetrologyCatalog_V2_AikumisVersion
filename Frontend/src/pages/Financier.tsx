@@ -98,7 +98,7 @@ export default function Financier() {
       setDownloadingContract(orderId);
       const token = localStorage.getItem('token');
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
-      const res = await fetch(`${baseUrl}/contracts/${orderId}/download`, {
+      const res = await fetch(`${baseUrl}/contracts/${orderId}/file`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error();
@@ -111,7 +111,6 @@ export default function Financier() {
     }
   };
 
-  // ─── Оплата ───────────────────────────────────────────────────────────────
   const handlePayment = async (orderId: number, paid: boolean) => {
     const label = paid ? 'подтвердить оплату' : 'пропустить оплату';
     if (!window.confirm(`${label.charAt(0).toUpperCase() + label.slice(1)}?`)) return;
@@ -319,7 +318,7 @@ export default function Financier() {
                           value={rejectReason[order.id] || ''}
                           onChange={e => setRejectReason(prev => ({ ...prev, [order.id]: e.target.value }))}
                           placeholder="Укажите причину отклонения..."
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-400 resize-none"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white outline-none focus:border-red-400 resize-none"
                           rows={3}
                           style={{ fontFamily: 'inherit', marginBottom: '8px' }}
                         />
@@ -414,7 +413,6 @@ export default function Financier() {
                     </div>
                   </div>
 
-                  {/* Объявление цены */}
                   {order.price == null ? (
                     <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1.5">Объявить цену *</label>
@@ -422,7 +420,7 @@ export default function Financier() {
                         <input type="number" value={prices[order.id] || ''}
                           onChange={e => setPrices((prev: Record<number, string>) => ({ ...prev, [order.id]: e.target.value }))}
                           placeholder="Введите сумму в тенге..."
-                          className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all"
+                          className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all"
                           style={{ fontFamily: 'inherit', marginBottom: 0 }} />
                         <button onClick={() => handleSetPrice(order.id)} disabled={settingPrice === order.id || !prices[order.id]}
                           className="px-4 py-3 bg-[#0A2E5C] hover:bg-[#0d3a73] disabled:bg-gray-200 disabled:cursor-not-allowed text-white font-medium rounded-xl border-none cursor-pointer text-sm transition-colors whitespace-nowrap"
@@ -438,7 +436,7 @@ export default function Financier() {
                       </svg>
                       <div>
                         <p className="text-xs text-green-600" style={{ margin: 0 }}>Цена объявлена</p>
-                        <p className="text-sm font-bold text-green-700" style={{ margin: 0 }}>{order.price.toLocaleString()} ₸</p>
+                        <p className="text-sm font-bold text-green-700" style={{ margin: 0 }}>{order.price?.toLocaleString()} ₸</p>
                       </div>
                     </div>
                   )}
@@ -448,7 +446,7 @@ export default function Financier() {
                     <textarea value={comments[order.id] || ''}
                       onChange={e => setComments(prev => ({ ...prev, [order.id]: e.target.value }))}
                       placeholder="Оплата получена..."
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all resize-none"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all resize-none"
                       rows={2} style={{ fontFamily: 'inherit', marginBottom: 0 }} />
                   </div>
 

@@ -250,7 +250,7 @@ export default function Director() {
                         <textarea value={rejectReason[order.id] || ''}
                           onChange={e => setRejectReason(prev => ({ ...prev, [order.id]: e.target.value }))}
                           placeholder="Укажите причину отклонения..."
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-red-400 resize-none"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white outline-none focus:border-red-400 resize-none"
                           rows={3} style={{ fontFamily: 'inherit', marginBottom: '8px' }} />
                         <div className="flex gap-2">
                           <button onClick={() => handleReject(order.id)}
