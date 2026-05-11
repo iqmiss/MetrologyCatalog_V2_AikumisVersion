@@ -4,20 +4,15 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-// Сервис для отправки email уведомлений через SMTP
-// Использует Mailtrap для тестирования (настройки в application.properties)
 @Service
 public class EmailService {
 
-    // JavaMailSender — Spring компонент для отправки писем через SMTP
     private final JavaMailSender mailSender;
 
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
-    // Отправляет уведомление клиенту при изменении статуса заявки
-    // Вызывается из OrderController.updateOrderStatus() при каждой смене статуса
     public void sendStatusUpdate(String toEmail, String fullName, String orderNumber, String newStatus) {
         String subject = "Обновление статуса заявки #" + orderNumber;
         String text = String.format(
@@ -29,8 +24,6 @@ public class EmailService {
         send(toEmail, subject, text);
     }
 
-    // Отправляет специальное уведомление когда заявка полностью завершена
-    // Сообщает клиенту что сертификат доступен для скачивания в личном кабинете
     public void sendOrderCompleted(String toEmail, String fullName, String orderNumber) {
         String subject = "Заявка #" + orderNumber + " завершена";
         String text = String.format(
@@ -43,14 +36,12 @@ public class EmailService {
         send(toEmail, subject, text);
     }
 
-    // Отправляет ссылку для сброса пароля
-    // Ссылка содержит UUID токен который действителен до перезапуска сервера
     public void sendPasswordReset(String toEmail, String fullName, String resetLink) {
         String subject = "Восстановление пароля";
         String text = String.format(
             "Уважаемый(ая) %s,\n\n" +
             "Для сброса пароля перейдите по ссылке:\n%s\n\n" +
-            "Ссылка действительна до перезапуска сервера.\n" +
+            "Ссылка действительна 24 часа.\n" +
             "Если вы не запрашивали сброс пароля — проигнорируйте это письмо.\n\n" +
             "С уважением,\nМетрологическая служба",
             fullName, resetLink
@@ -58,32 +49,81 @@ public class EmailService {
         send(toEmail, subject, text);
     }
 
-    // Внутренний метод для формирования и отправки письма через SMTP
-    // Все публичные методы используют его для отправки
+    public void sendContractReady(String toEmail, String fullName, String orderNumber) {
+        String subject = "Договор по заявке #" + orderNumber + " готов к подписанию";
+        String text = String.format(
+            "Уважаемый(ая) %s,\n\n" +
+            "Договор по вашей заявке #%s подготовлен и ожидает вашей подписи.\n" +
+            "Войдите в личный кабинет для ознакомления и подписания.\n\n" +
+            "С уважением,\nМетрологическая служба",
+            fullName, orderNumber
+        );
+        send(toEmail, subject, text);
+    }
+
+    public void sendReturnedToRevision(String toEmail, String fullName, String orderNumber) {
+        String subject = "Заявка #" + orderNumber + " возвращена на доработку";
+        String text = String.format(
+            "Уважаемый(ая) %s,\n\n" +
+            "Ваша заявка #%s возвращена на доработку. " +
+            "Пожалуйста, войдите в личный кабинет, ознакомьтесь с комментарием менеджера и внесите необходимые исправления.\n\n" +
+            "С уважением,\nМетрологическая служба",
+            fullName, orderNumber
+        );
+        send(toEmail, subject, text);
+    }
+
+    public void sendInvoiceReady(String toEmail, String fullName, String orderNumber) {
+        String subject = "Счёт на оплату по заявке #" + orderNumber;
+        String text = String.format(
+            "Уважаемый(ая) %s,\n\n" +
+            "Счёт на оплату по заявке #%s доступен в вашем личном кабинете.\n" +
+            "Пожалуйста, произведите оплату и прикрепите подтверждение.\n\n" +
+            "С уважением,\nМетрологическая служба",
+            fullName, orderNumber
+        );
+        send(toEmail, subject, text);
+    }
+
+    public void sendAssignedToLab(String toEmail, String fullName, String orderNumber, String labName) {
+        String subject = "Заявка #" + orderNumber + " направлена на исполнение";
+        String text = String.format(
+            "Уважаемый(ая) %s,\n\n" +
+            "Ваша заявка #%s направлена на исполнение в %s.\n" +
+            "Вы можете отслеживать статус в личном кабинете.\n\n" +
+            "С уважением,\nМетрологическая служба",
+            fullName, orderNumber, labName
+        );
+        send(toEmail, subject, text);
+    }
+
     private void send(String to, String subject, String text) {
         try {
-            System.out.println("Отправка email на: " + to);
             SimpleMailMessage message = new SimpleMailMessage();
             message.setTo(to);
             message.setSubject(subject);
             message.setText(text);
             mailSender.send(message);
-            System.out.println("Email отправлен успешно");
         } catch (Exception e) {
-            System.err.println("Ошибка отправки email: " + e.getMessage());
+            System.err.println("Ошибка отправки email на " + to + ": " + e.getMessage());
         }
     }
 
-    // Переводит технические названия статусов на русский язык для email
     private String translateStatus(String status) {
         return switch (status) {
-            case "new"               -> "Новая";
+            case "pending_contract"  -> "Ожидает создания договора";
+            case "revision"          -> "Возвращена на доработку";
+            case "awaiting_approval" -> "На согласовании";
+            case "awaiting_director" -> "У директора";
             case "awaiting_payment"  -> "Ожидает оплаты";
             case "awaiting_delivery" -> "Ожидает доставки";
             case "received_in_lab"   -> "Принято в лабораторию";
             case "in_work"           -> "В работе";
             case "under_review"      -> "На проверке";
             case "completed"         -> "Завершено";
+            case "cancelled"         -> "Отменено";
+            case "annulled"          -> "Аннулировано";
+            case "terminated"        -> "Расторгнуто";
             default                  -> status;
         };
     }

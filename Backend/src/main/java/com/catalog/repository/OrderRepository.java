@@ -13,9 +13,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findByLabId(int labId);
     List<Order> findByStatus(String status);
 
-    // Счётчики по статусам — каждый отдельный быстрый COUNT запрос
     long countByStatus(String status);
 
-    @Query("SELECT COALESCE(SUM(o.totalPrice), 0) FROM Order o WHERE o.status = 'completed'")
+    @Query("SELECT COALESCE(SUM(o.price), 0) FROM Order o WHERE o.status = 'completed'")
     double sumRevenue();
 }

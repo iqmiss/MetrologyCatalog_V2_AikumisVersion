@@ -4,6 +4,7 @@ import com.catalog.models.Contract;
 import com.catalog.models.Order;
 import com.catalog.repository.ContractRepository;
 import com.catalog.repository.OrderRepository;
+import com.catalog.service.NotificationService;
 import com.catalog.service.PdfService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -11,10 +12,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.Map;
 
-// Контроллер для управления договорами
-// Flow: менеджер создаёт → согласующие проверяют → директор подписывает → клиент подписывает
+/**
+ * Флоу по схеме:
+ * 1. Менеджер загружает файл договора → pending_approval
+ * 2. Тройка (director + approver + financier) подписывает параллельно
+ * 3. Клиент подписывает
+ * 4. Ген.директор подписывает → регистрационный номер → awaiting_payment
+ * 5. Финансист формирует счёт → передаёт менеджеру
+ * 6. Менеджер отправляет клиенту
+ */
 @RestController
 @RequestMapping("/api/contracts")
 @CrossOrigin(origins = "http://localhost:5173")
@@ -23,285 +33,438 @@ public class ContractController {
     private final ContractRepository contractRepository;
     private final OrderRepository orderRepository;
     private final PdfService pdfService;
+    private final NotificationService notificationService;
 
     public ContractController(ContractRepository contractRepository,
                                OrderRepository orderRepository,
-                               PdfService pdfService) {
+                               PdfService pdfService,
+                               NotificationService notificationService) {
         this.contractRepository = contractRepository;
         this.orderRepository = orderRepository;
         this.pdfService = pdfService;
+        this.notificationService = notificationService;
     }
 
     // GET /api/contracts/{orderId}
-    // Возвращает данные договора по ID заявки
     @GetMapping("/{orderId}")
     public ResponseEntity<?> getContract(@PathVariable int orderId) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
+            if (contract == null)
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
-            return ResponseEntity.ok(contract);
+            // Не возвращаем Base64 файл в общем ответе — только метаданные
+            Contract response = copyWithoutFile(contract);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Ошибка при получении договора"));
         }
     }
 
     // POST /api/contracts/{orderId}
-    // Менеджер создаёт договор для заявки
-    // После создания заявка переходит в статус awaiting_approval
+    // Менеджер загружает файл договора и отправляет на согласование тройке
     @PostMapping("/{orderId}")
-    public ResponseEntity<?> createContract(@PathVariable int orderId) {
+    public ResponseEntity<?> uploadContract(@PathVariable int orderId,
+                                             @RequestBody UploadContractRequest request) {
         try {
-            Contract existing = contractRepository.findByOrderId(orderId).orElse(null);
-            if (existing != null) {
-                return ResponseEntity.ok(existing);
-            }
-
             Order order = orderRepository.findById(orderId).orElse(null);
-            if (order == null) {
+            if (order == null)
                 return ResponseEntity.status(404).body(Map.of("message", "Заявка не найдена"));
-            }
 
-            // Создаём договор со статусом draft
-            Contract contract = new Contract(orderId, "CNT-" + System.currentTimeMillis());
+            if (request.getFileData() == null || request.getFileData().isBlank())
+                return ResponseEntity.status(400).body(Map.of("message", "Файл договора обязателен"));
+            if (request.getFileName() == null || request.getFileName().isBlank())
+                return ResponseEntity.status(400).body(Map.of("message", "Имя файла обязательно"));
+            if (request.getFileData().length() > 10_000_000)
+                return ResponseEntity.status(400).body(Map.of("message", "Файл слишком большой. Максимум 7MB"));
+
+            Contract contract = contractRepository.findByOrderId(orderId)
+                .orElse(new Contract(orderId, "CNT-" + System.currentTimeMillis()));
+
+            // Если уже на согласовании или подписан — не трогаем
+            if ("pending_approval".equals(contract.getStatus()) || "signed".equals(contract.getStatus()))
+                return ResponseEntity.ok(copyWithoutFile(contract));
+
+            contract.setContractFile(request.getFileData());
+            contract.setContractFileName(request.getFileName());
             contract.setStatus("pending_approval");
+            // Сбрасываем все подписи при повторной загрузке
+            contract.setApproverSigned(false); contract.setApproverSignedAt(null); contract.setApproverSignedBy(null);
+            contract.setFinancierSigned(false); contract.setFinancierSignedAt(null); contract.setFinancierSignedBy(null);
+            contract.setDirectorSigned(false); contract.setDirectorSignedAt(null); contract.setDirectorSignedBy(null);
+            contract.setClientSigned(false); contract.setClientSignedAt(null); contract.setClientSignedBy(null);
+            contract.setGenDirectorSigned(false); contract.setGenDirectorSignedAt(null); contract.setGenDirectorSignedBy(null);
+            contract.setRejectedByRole(null); contract.setRejectedReason(null);
             contractRepository.save(contract);
 
-            // Переводим заявку в статус ожидания согласования
             order.setStatus("awaiting_approval");
             orderRepository.save(order);
 
-            return ResponseEntity.status(201).body(contractRepository.findByOrderId(orderId).orElse(null));
+            notificationService.notifyParallelApprovers(orderId, order.getOrderNumber());
+
+            return ResponseEntity.ok(copyWithoutFile(contractRepository.findByOrderId(orderId).orElse(contract)));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при создании договора"));
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при загрузке договора: " + e.getMessage()));
         }
     }
 
-    // PUT /api/contracts/{orderId}/submit
-    // Менеджер отправляет договор на согласование
-    @PutMapping("/{orderId}/submit")
-    public ResponseEntity<?> submitForApproval(@PathVariable int orderId) {
+    // GET /api/contracts/{orderId}/file
+    // Скачать файл договора (все роли которым нужно подписать)
+    @GetMapping("/{orderId}/file")
+    public ResponseEntity<?> downloadContractFile(@PathVariable int orderId) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
+            if (contract == null)
                 return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
+            if (contract.getContractFile() == null)
+                return ResponseEntity.status(404).body(Map.of("message", "Файл договора ещё не загружен"));
+
+            byte[] fileBytes = Base64.getDecoder().decode(contract.getContractFile());
+            String fileName = contract.getContractFileName() != null
+                ? contract.getContractFileName()
+                : "contract_" + orderId + ".pdf";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(fileName.endsWith(".pdf") ? MediaType.APPLICATION_PDF : MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", fileName);
+            headers.setContentLength(fileBytes.length);
+            return ResponseEntity.ok().headers(headers).body(fileBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при скачивании файла"));
+        }
+    }
+
+    // PUT /api/contracts/{orderId}/submit — повторная отправка после rejected
+    @PutMapping("/{orderId}/submit")
+    public ResponseEntity<?> resubmitForApproval(@PathVariable int orderId) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null)
+                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
+            if (contract.getContractFile() == null)
+                return ResponseEntity.status(400).body(Map.of("message", "Сначала загрузите файл договора"));
 
             contract.setStatus("pending_approval");
+            contract.setApproverSigned(false); contract.setApproverSignedAt(null); contract.setApproverSignedBy(null);
+            contract.setFinancierSigned(false); contract.setFinancierSignedAt(null); contract.setFinancierSignedBy(null);
+            contract.setDirectorSigned(false); contract.setDirectorSignedAt(null); contract.setDirectorSignedBy(null);
+            contract.setClientSigned(false); contract.setClientSignedAt(null); contract.setClientSignedBy(null);
+            contract.setGenDirectorSigned(false); contract.setGenDirectorSignedAt(null); contract.setGenDirectorSignedBy(null);
+            contract.setRejectedByRole(null); contract.setRejectedReason(null);
             contractRepository.save(contract);
 
-            return ResponseEntity.ok(contract);
+            Order order = orderRepository.findById(orderId).orElse(null);
+            if (order != null) {
+                order.setStatus("awaiting_approval");
+                orderRepository.save(order);
+                notificationService.notifyParallelApprovers(orderId, order.getOrderNumber());
+            }
+
+            return ResponseEntity.ok(copyWithoutFile(contract));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Ошибка при отправке на согласование"));
         }
     }
 
-    // PUT /api/contracts/{orderId}/approve
-    // Согласующий одобряет договор
-    @PutMapping("/{orderId}/approve")
-    public ResponseEntity<?> approveContract(@PathVariable int orderId, @RequestBody SignRequest request) {
+    // ── Шаг 2: Параллельная тройка ────────────────────────────────────────────
+
+    @PutMapping("/{orderId}/sign/approver")
+    public ResponseEntity<?> signByApprover(@PathVariable int orderId, @RequestBody SignRequest req) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
-                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
+            if (contract == null) return notFound();
+            if (!"pending_approval".equals(contract.getStatus()))
+                return ResponseEntity.badRequest().body(Map.of("message", "Договор не на согласовании"));
+            if (contract.getContractFile() == null)
+                return ResponseEntity.badRequest().body(Map.of("message", "Менеджер ещё не загрузил файл договора"));
+            if (contract.isApproverSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Согласующий уже подписал"));
 
-            // После одобрения всех согласующих — переходит к директору
-            contract.setStatus("approved");
+            contract.setApproverSigned(true);
+            contract.setApproverSignedAt(LocalDateTime.now());
+            contract.setApproverSignedBy(req.userId);
             contractRepository.save(contract);
 
-            // Обновляем статус заявки
-            Order order = orderRepository.findById(orderId).orElse(null);
-            if (order != null) {
-                order.setStatus("awaiting_director");
-                orderRepository.save(order);
-            }
-
-            return ResponseEntity.ok(contract);
+            checkTrioAndNotifyClient(contract, orderId);
+            return ResponseEntity.ok(copyWithoutFile(contractRepository.findByOrderId(orderId).orElse(contract)));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при согласовании"));
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
         }
     }
 
-    // PUT /api/contracts/{orderId}/reject
-    // Согласующий отклоняет договор — возвращается менеджеру на доработку
-    @PutMapping("/{orderId}/reject")
-    public ResponseEntity<?> rejectContract(@PathVariable int orderId, @RequestBody RejectRequest request) {
+    @PutMapping("/{orderId}/sign/financier")
+    public ResponseEntity<?> signByFinancier(@PathVariable int orderId, @RequestBody SignRequest req) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
-                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
+            if (contract == null) return notFound();
+            if (!"pending_approval".equals(contract.getStatus()))
+                return ResponseEntity.badRequest().body(Map.of("message", "Договор не на согласовании"));
+            if (contract.getContractFile() == null)
+                return ResponseEntity.badRequest().body(Map.of("message", "Менеджер ещё не загрузил файл договора"));
+            if (contract.isFinancierSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Финансист уже подписал"));
 
-            contract.setStatus("rejected");
+            contract.setFinancierSigned(true);
+            contract.setFinancierSignedAt(LocalDateTime.now());
+            contract.setFinancierSignedBy(req.userId);
             contractRepository.save(contract);
 
-            // Возвращаем заявку на pending_contract для доработки менеджером
+            checkTrioAndNotifyClient(contract, orderId);
+            return ResponseEntity.ok(copyWithoutFile(contractRepository.findByOrderId(orderId).orElse(contract)));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
+        }
+    }
+
+    @PutMapping("/{orderId}/sign/director")
+    public ResponseEntity<?> signByDirector(@PathVariable int orderId, @RequestBody SignRequest req) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+            if (!"pending_approval".equals(contract.getStatus()))
+                return ResponseEntity.badRequest().body(Map.of("message", "Договор не на согласовании"));
+            if (contract.getContractFile() == null)
+                return ResponseEntity.badRequest().body(Map.of("message", "Менеджер ещё не загрузил файл договора"));
+            if (contract.isDirectorSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Директор уже подписал"));
+
+            contract.setDirectorSigned(true);
+            contract.setDirectorSignedAt(LocalDateTime.now());
+            contract.setDirectorSignedBy(req.userId);
+            contractRepository.save(contract);
+
+            checkTrioAndNotifyClient(contract, orderId);
+            return ResponseEntity.ok(copyWithoutFile(contractRepository.findByOrderId(orderId).orElse(contract)));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
+        }
+    }
+
+    // ── Шаг 3: Клиент ─────────────────────────────────────────────────────────
+
+    @PutMapping("/{orderId}/sign/client")
+    public ResponseEntity<?> signByClient(@PathVariable int orderId, @RequestBody SignRequest req) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+            if (!contract.isTrioSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Договор ещё не подписан всеми сторонами организации"));
+            if (contract.isClientSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Клиент уже подписал"));
+
+            contract.setClientSigned(true);
+            contract.setClientSignedAt(LocalDateTime.now());
+            contract.setClientSignedBy(req.userId);
+            contractRepository.save(contract);
+
+            Order order = orderRepository.findById(orderId).orElse(null);
+            if (order != null)
+                notificationService.notifyGenDirectorForSigning(orderId, order.getOrderNumber());
+
+            return ResponseEntity.ok(copyWithoutFile(contract));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
+        }
+    }
+
+    // ── Шаг 4: Ген.директор (финальная подпись) ───────────────────────────────
+
+    @PutMapping("/{orderId}/sign/gen_director")
+    public ResponseEntity<?> signByGenDirector(@PathVariable int orderId, @RequestBody SignRequest req) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+            if (!contract.isTrioSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Тройка ещё не подписала договор"));
+            if (!contract.isClientSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Клиент ещё не подписал договор"));
+            if (contract.isGenDirectorSigned())
+                return ResponseEntity.badRequest().body(Map.of("message", "Ген.директор уже подписал"));
+
+            contract.setGenDirectorSigned(true);
+            contract.setGenDirectorSignedAt(LocalDateTime.now());
+            contract.setGenDirectorSignedBy(req.userId);
+            contract.setStatus("signed");
+
+            // Присваиваем регистрационный номер
+            String regNumber = "РЕГ-" + DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDateTime.now())
+                + "-" + orderId;
+            contract.setRegistrationNumber(regNumber);
+            contractRepository.save(contract);
+
+            // Договор полностью подписан → awaiting_payment
+            // Уведомляем финансиста — нужно сформировать счёт и передать менеджеру
+            Order order = orderRepository.findById(orderId).orElse(null);
+            if (order != null) {
+                order.setStatus("awaiting_payment");
+                orderRepository.save(order);
+                notificationService.notifyFinanciersContractSigned(orderId, order.getOrderNumber());
+            }
+
+            return ResponseEntity.ok(copyWithoutFile(contract));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
+        }
+    }
+
+    // ── Отклонение ────────────────────────────────────────────────────────────
+
+    @PutMapping("/{orderId}/reject")
+    public ResponseEntity<?> rejectContract(@PathVariable int orderId, @RequestBody RejectRequest req) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+
+            contract.setStatus("rejected");
+            contract.setRejectedByRole(req.role != null ? req.role : "unknown");
+            contract.setRejectedReason(req.reason);
+            contractRepository.save(contract);
+
             Order order = orderRepository.findById(orderId).orElse(null);
             if (order != null) {
                 order.setStatus("pending_contract");
                 orderRepository.save(order);
+                notificationService.notifyManagersRejected(orderId, order.getOrderNumber(),
+                    req.reason != null ? req.reason : "Причина не указана");
             }
 
-            return ResponseEntity.ok(contract);
+            return ResponseEntity.ok(copyWithoutFile(contract));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Ошибка при отклонении"));
         }
     }
 
-    // PUT /api/contracts/{orderId}/sign/director
-    // Директор подписывает договор — после согласования
-    @PutMapping("/{orderId}/sign/director")
-    public ResponseEntity<?> signByDirector(@PathVariable int orderId, @RequestBody SignRequest request) {
-        try {
-            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
-                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
-            if (!"approved".equals(contract.getStatus())) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Договор должен быть согласован перед подписью директора"));
-            }
-            if (contract.isDirectorSigned()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Директор уже подписал договор"));
-            }
-
-            contract.setDirectorSigned(true);
-            contract.setDirectorSignedAt(LocalDateTime.now());
-            contract.setDirectorSignedBy(request.getUserId());
-            contract.setStatus("signed");
-            contractRepository.save(contract);
-
-            // После подписи директора — клиент может оплачивать
-            Order order = orderRepository.findById(orderId).orElse(null);
-            if (order != null) {
-                order.setStatus("awaiting_payment");
-                orderRepository.save(order);
-            }
-
-            return ResponseEntity.ok(contract);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
-        }
+    // Legacy — для совместимости
+    @PutMapping("/{orderId}/approve")
+    public ResponseEntity<?> approveContract(@PathVariable int orderId, @RequestBody SignRequest req) {
+        return signByApprover(orderId, req);
     }
 
-    // PUT /api/contracts/{orderId}/sign/client
-    // Клиент подписывает договор со своей стороны
-    @PutMapping("/{orderId}/sign/client")
-    public ResponseEntity<?> signByClient(@PathVariable int orderId, @RequestBody SignRequest request) {
-        try {
-            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
-                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
-            if (!"signed".equals(contract.getStatus()) && !"awaiting_payment".equals(contract.getStatus())) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Договор ещё не готов к подписанию"));
-            }
-            if (contract.isClientSigned()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Клиент уже подписал договор"));
-            }
-
-            contract.setClientSigned(true);
-            contract.setClientSignedAt(LocalDateTime.now());
-            contract.setClientSignedBy(request.getUserId());
-            contractRepository.save(contract);
-
-            return ResponseEntity.ok(contract);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подписании"));
-        }
-    }
-
-    // PUT /api/contracts/{orderId}/annul
-    // Аннулирование договора — обе стороны
     @PutMapping("/{orderId}/annul")
-    public ResponseEntity<?> annulContract(@PathVariable int orderId, @RequestBody RejectRequest request) {
+    public ResponseEntity<?> annulContract(@PathVariable int orderId, @RequestBody RejectRequest req) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
-                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
-
+            if (contract == null) return notFound();
             contract.setStatus("annulled");
             contract.setAnnulledAt(LocalDateTime.now());
-            contract.setAnnulledBy(request.getUserId());
-            contract.setAnnulledReason(request.getReason());
+            contract.setAnnulledBy(req.userId);
+            contract.setAnnulledReason(req.reason);
             contractRepository.save(contract);
-
             Order order = orderRepository.findById(orderId).orElse(null);
-            if (order != null) {
-                order.setStatus("annulled");
-                orderRepository.save(order);
-            }
-
-            return ResponseEntity.ok(contract);
+            if (order != null) { order.setStatus("annulled"); orderRepository.save(order); }
+            return ResponseEntity.ok(copyWithoutFile(contract));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Ошибка при аннулировании"));
         }
     }
 
-    // PUT /api/contracts/{orderId}/terminate
-    // Расторжение договора — одна сторона инициирует
     @PutMapping("/{orderId}/terminate")
-    public ResponseEntity<?> terminateContract(@PathVariable int orderId, @RequestBody RejectRequest request) {
+    public ResponseEntity<?> terminateContract(@PathVariable int orderId, @RequestBody RejectRequest req) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
-            if (contract == null) {
-                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
-            }
-
+            if (contract == null) return notFound();
             contract.setStatus("terminated");
             contract.setTerminatedAt(LocalDateTime.now());
-            contract.setTerminatedBy(request.getUserId());
-            contract.setTerminatedReason(request.getReason());
+            contract.setTerminatedBy(req.userId);
+            contract.setTerminatedReason(req.reason);
             contractRepository.save(contract);
-
             Order order = orderRepository.findById(orderId).orElse(null);
-            if (order != null) {
-                order.setStatus("terminated");
-                orderRepository.save(order);
-            }
-
-            return ResponseEntity.ok(contract);
+            if (order != null) { order.setStatus("terminated"); orderRepository.save(order); }
+            return ResponseEntity.ok(copyWithoutFile(contract));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("message", "Ошибка при расторжении"));
         }
     }
 
-    // GET /api/contracts/{orderId}/download
-    // Генерирует и возвращает PDF договора
+    // GET /api/contracts/{orderId}/download — генерирует PDF из данных (fallback если нет загруженного файла)
     @GetMapping("/{orderId}/download")
-    public ResponseEntity<byte[]> downloadContract(@PathVariable int orderId) {
+    public ResponseEntity<?> downloadContract(@PathVariable int orderId) {
         try {
             Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
             Order order = orderRepository.findById(orderId).orElse(null);
+            if (contract == null || order == null)
+                return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
 
-            if (contract == null || order == null) {
-                return ResponseEntity.status(404).build();
+            // Если есть загруженный файл — отдаём его
+            if (contract.getContractFile() != null) {
+                byte[] fileBytes = Base64.getDecoder().decode(contract.getContractFile());
+                String fileName = contract.getContractFileName() != null
+                    ? contract.getContractFileName() : "contract_" + orderId + ".pdf";
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_PDF);
+                headers.setContentDispositionFormData("attachment", fileName);
+                headers.setContentLength(fileBytes.length);
+                return ResponseEntity.ok().headers(headers).body(fileBytes);
             }
 
+            // Иначе генерируем PDF
             byte[] pdfBytes = pdfService.generateContract(order, contract);
-
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "contract_" + orderId + ".pdf");
             headers.setContentLength(pdfBytes.length);
-
             return ResponseEntity.ok().headers(headers).body(pdfBytes);
         } catch (Exception e) {
-            return ResponseEntity.status(500).build();
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при скачивании договора"));
         }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void checkTrioAndNotifyClient(Contract contract, int orderId) {
+        Contract fresh = contractRepository.findByOrderId(orderId).orElse(contract);
+        if (fresh.isTrioSigned()) {
+            Order order = orderRepository.findById(orderId).orElse(null);
+            if (order != null)
+                notificationService.notifyClientTrioSigned(order.getClientId(), orderId, order.getOrderNumber());
+        }
+    }
+
+    // Возвращает копию договора без Base64 файла чтобы не гонять его по сети в каждом запросе
+    private Contract copyWithoutFile(Contract c) {
+        Contract copy = new Contract();
+        copy.setId(c.getId());
+        copy.setOrderId(c.getOrderId());
+        copy.setContractNumber(c.getContractNumber());
+        copy.setRegistrationNumber(c.getRegistrationNumber());
+        copy.setContractFileName(c.getContractFileName());
+        copy.setFilePath(c.getFilePath());
+        copy.setStatus(c.getStatus());
+        copy.setDirectorSigned(c.isDirectorSigned());
+        copy.setDirectorSignedAt(c.getDirectorSignedAt());
+        copy.setApproverSigned(c.isApproverSigned());
+        copy.setApproverSignedAt(c.getApproverSignedAt());
+        copy.setFinancierSigned(c.isFinancierSigned());
+        copy.setFinancierSignedAt(c.getFinancierSignedAt());
+        copy.setClientSigned(c.isClientSigned());
+        copy.setClientSignedAt(c.getClientSignedAt());
+        copy.setGenDirectorSigned(c.isGenDirectorSigned());
+        copy.setGenDirectorSignedAt(c.getGenDirectorSignedAt());
+        copy.setRejectedByRole(c.getRejectedByRole());
+        copy.setRejectedReason(c.getRejectedReason());
+        return copy;
+    }
+
+    private ResponseEntity<?> notFound() {
+        return ResponseEntity.status(404).body(Map.of("message", "Договор не найден"));
+    }
+
+    // ── Request classes ───────────────────────────────────────────────────────
+
+    public static class UploadContractRequest {
+        public String fileData;
+        public String fileName;
+        public String getFileData() { return fileData; }
+        public String getFileName() { return fileName; }
     }
 
     public static class SignRequest {
         public Integer userId;
-        public Integer getUserId() { return userId; }
     }
 
     public static class RejectRequest {
         public Integer userId;
         public String reason;
-        public Integer getUserId() { return userId; }
-        public String getReason() { return reason; }
+        public String role;
     }
 }

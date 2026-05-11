@@ -24,18 +24,14 @@ public class OrderItem {
     @Column(nullable = false)
     private int quantity;
 
-    @Column(name = "unit_price", nullable = false, columnDefinition = "DECIMAL(10,2)")
-    private double unitPrice;
-
     public OrderItem() {}
 
-    public OrderItem(int orderId, String deviceType, String model, String serialNumber, int quantity, double unitPrice) {
+    public OrderItem(int orderId, String deviceType, String model, String serialNumber, int quantity) {
         this.orderId = orderId;
         this.deviceType = deviceType;
         this.model = model;
         this.serialNumber = serialNumber;
         this.quantity = quantity;
-        this.unitPrice = unitPrice;
     }
 
     public int getId() { return id; }
@@ -55,7 +51,4 @@ public class OrderItem {
 
     public int getQuantity() { return quantity; }
     public void setQuantity(int quantity) { this.quantity = quantity; }
-    
-    public double getUnitPrice() { return unitPrice; }
-    public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
 }

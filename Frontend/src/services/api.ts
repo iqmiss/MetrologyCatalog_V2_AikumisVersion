@@ -6,17 +6,13 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api'
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
   (error) => Promise.reject(error)
@@ -56,40 +52,73 @@ export const orderApi = {
   getByStatus: (status: string) => api.get(`/orders/status/${status}`),
   create: (data: any) => api.post('/orders', data),
   updateStatus: (id: number, status: string) => api.put(`/orders/${id}/status`, { status }),
-  confirmPayment: (id: number, paid: boolean, comment?: string, invoiceAmount?: number | null) =>
-    api.put(`/orders/${id}/payment`, { paid, comment, invoiceAmount }),
+  confirmPayment: (id: number, paid: boolean, comment?: string, price?: number | null) =>
+    api.put(`/orders/${id}/payment`, { paid, comment, price }),
   update: (id: number, data: any) => api.put(`/orders/${id}`, data),
+  returnToRevision: (id: number, comment: string) =>
+    api.put(`/orders/${id}/return`, { comment }),
+  resubmit: (id: number, data: any) =>
+    api.put(`/orders/${id}/resubmit`, data),
+  sendInvoice: (id: number) =>
+    api.put(`/orders/${id}/send-invoice`),
+  uploadReceipt: (id: number, fileData: string, fileName: string) =>
+    api.put(`/orders/${id}/upload-receipt`, { fileData, fileName }),
+  getReceipt: (id: number) =>
+    api.get(`/orders/${id}/receipt`),
+  assignLab: (id: number, labId: number) =>
+    api.put(`/orders/${id}/assign-lab`, { labId }),
+  notifyDirector: (id: number) =>
+    api.put(`/orders/${id}/notify-director`),
+  setPrice: (id: number, price: number) =>
+    api.put(`/orders/${id}/set-price`, { price }),
+};
+
+export const pdfApi = {
+  downloadCertificate: (orderId: number) =>
+    api.get(`/pdf/certificate/${orderId}`, { responseType: 'blob' }),
+  downloadInvoice: (orderId: number) =>
+    api.get(`/pdf/invoice/${orderId}`, { responseType: 'blob' }),
 };
 
 export const contractApi = {
   getByOrderId: (orderId: number) => api.get(`/contracts/${orderId}`),
-  create: (orderId: number) => api.post(`/contracts/${orderId}`),
-
-  // Менеджер отправляет на согласование
+  // Менеджер загружает файл договора
+  uploadContract: (orderId: number, fileData: string, fileName: string) =>
+    api.post(`/contracts/${orderId}`, { fileData, fileName }),
   submit: (orderId: number) => api.put(`/contracts/${orderId}/submit`),
-
-  // Согласующий одобряет/отклоняет
-  approve: (orderId: number, userId: number) =>
-    api.put(`/contracts/${orderId}/approve`, { userId }),
-  reject: (orderId: number, userId: number, reason: string) =>
-    api.put(`/contracts/${orderId}/reject`, { userId, reason }),
-
-  // Директор подписывает
+  // Скачать загруженный файл договора
+  downloadFile: (orderId: number) =>
+    api.get(`/contracts/${orderId}/file`, { responseType: 'blob' }),
+  // Параллельная тройка
+  signByApprover: (orderId: number, userId: number) =>
+    api.put(`/contracts/${orderId}/sign/approver`, { userId }),
+  signByFinancier: (orderId: number, userId: number) =>
+    api.put(`/contracts/${orderId}/sign/financier`, { userId }),
   signByDirector: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/director`, { userId }),
-
-  // Клиент подписывает
+  // Клиент
   signByClient: (orderId: number, userId: number) =>
     api.put(`/contracts/${orderId}/sign/client`, { userId }),
-
-  // Аннулирование и расторжение
+  // Ген.директор — последний
+  signByGenDirector: (orderId: number, userId: number) =>
+    api.put(`/contracts/${orderId}/sign/gen_director`, { userId }),
+  // Отклонение
+  reject: (orderId: number, userId: number, reason: string, role: string) =>
+    api.put(`/contracts/${orderId}/reject`, { userId, reason, role }),
+  // Аннулирование / расторжение
   annul: (orderId: number, userId: number, reason: string) =>
     api.put(`/contracts/${orderId}/annul`, { userId, reason }),
   terminate: (orderId: number, userId: number, reason: string) =>
     api.put(`/contracts/${orderId}/terminate`, { userId, reason }),
-
   download: (orderId: number) =>
     api.get(`/contracts/${orderId}/download`, { responseType: 'blob' }),
+};
+
+export const notificationApi = {
+  getAll: (userId: number) => api.get('/notifications', { params: { userId } }),
+  getUnread: (userId: number) => api.get('/notifications/unread', { params: { userId } }),
+  markAsRead: (id: number) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: (userId: number) => api.put('/notifications/read-all', null, { params: { userId } }),
 };
 
 export const resultApi = {
@@ -97,10 +126,8 @@ export const resultApi = {
   create: (data: any) => api.post('/results', data),
 };
 
-export const notificationApi = {
-  getAll: () => api.get('/notifications'),
-  getUnread: () => api.get('/notifications/unread'),
-  markAsRead: (id: number) => api.put(`/notifications/${id}/read`),
+export const laboratoryApi = {
+  getAll: () => api.get('/laboratories'),
 };
 
 export const userApi = {

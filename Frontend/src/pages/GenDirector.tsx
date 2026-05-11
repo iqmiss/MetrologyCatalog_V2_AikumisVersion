@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
-import { orderApi, contractApi, laboratoryApi } from '../services/api';
+import { contractApi, laboratoryApi } from '../services/api';
+import api from '../services/api';
 import type { Order, Contract, Laboratory } from '../types';
 
-export default function Director() {
+export default function GenDirector() {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'sign' | 'assign'>('sign');
 
+  // Заявки где тройка + клиент уже подписали, ген.дир ещё нет
   const [signOrders, setSignOrders] = useState<Order[]>([]);
   const [contracts, setContracts] = useState<Record<number, Contract>>({});
   const [assignOrders, setAssignOrders] = useState<Order[]>([]);
@@ -27,23 +29,36 @@ export default function Director() {
   const fetchAll = async () => {
     try {
       setIsLoading(true);
-      const [signRes, assignRes, labRes] = await Promise.all([
-        orderApi.getByStatus('awaiting_approval'),
-        orderApi.getByStatus('awaiting_delivery'),
+      // Загружаем заявки в awaiting_approval + awaiting_delivery
+      const [approvalRes, deliveryRes, labRes] = await Promise.all([
+        api.get('/orders/status/awaiting_approval'),
+        api.get('/orders/status/awaiting_delivery'),
         laboratoryApi.getAll(),
       ]);
-      setSignOrders(signRes.data);
-      setAssignOrders(assignRes.data);
+
+      setAssignOrders(deliveryRes.data);
       setLaboratories(labRes.data);
 
+      // Загружаем договоры и фильтруем: только те где тройка + клиент подписали
+      const allOrders: Order[] = approvalRes.data;
       const contractMap: Record<number, Contract> = {};
-      await Promise.all(signRes.data.map(async (order: Order) => {
+
+      await Promise.all(allOrders.map(async (order) => {
         try {
           const c = await contractApi.getByOrderId(order.id);
           contractMap[order.id] = c.data;
         } catch {}
       }));
+
       setContracts(contractMap);
+
+      // Ген.дир видит только договоры где тройка + клиент уже подписали
+      const forGenDirector = allOrders.filter(o => {
+        const c = contractMap[o.id];
+        return c && c.approverSigned && c.financierSigned && c.directorSigned && c.clientSigned && !c.genDirectorSigned;
+      });
+      setSignOrders(forGenDirector);
+
     } catch {
       setError('Ошибка при загрузке данных');
     } finally {
@@ -75,11 +90,11 @@ export default function Director() {
   };
 
   const handleSign = async (orderId: number) => {
-    if (!window.confirm('Подписать договор ЭЦП?')) return;
+    if (!window.confirm('Подписать договор ЭЦП? Это финальная подпись — договор вступит в силу.')) return;
     try {
       setSigning(orderId);
-      await contractApi.signByDirector(orderId, user?.id || 0);
-      await fetchAll();
+      await contractApi.signByGenDirector(orderId, user?.id || 0);
+      setSignOrders(prev => prev.filter(o => o.id !== orderId));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при подписании');
     } finally {
@@ -91,7 +106,7 @@ export default function Director() {
     const reason = rejectReason[orderId];
     if (!reason?.trim()) { setError('Укажите причину отклонения'); return; }
     try {
-      await contractApi.reject(orderId, user?.id || 0, reason, 'director');
+      await contractApi.reject(orderId, user?.id || 0, reason, 'gen_director');
       setSignOrders(prev => prev.filter(o => o.id !== orderId));
       setShowReject(null);
     } catch (err: any) {
@@ -105,7 +120,7 @@ export default function Director() {
     if (!window.confirm('Направить заявку в выбранную лабораторию?')) return;
     try {
       setAssigning(orderId);
-      await orderApi.assignLab(orderId, labId);
+      await api.put(`/orders/${orderId}/assign-lab`, { labId });
       setAssignOrders(prev => prev.filter(o => o.id !== orderId));
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при направлении');
@@ -140,10 +155,10 @@ export default function Director() {
 
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-[#0A2E5C]" style={{ margin: 0, fontSize: '1.75rem' }}>
-            Кабинет директора
+            Кабинет генерального директора
           </h1>
           <p className="text-gray-500 text-sm mt-1" style={{ margin: '4px 0 0' }}>
-            Подписание договоров и направление заявок на исполнение
+            Финальное подписание договоров и направление заявок на исполнение
           </p>
         </div>
 
@@ -159,10 +174,10 @@ export default function Director() {
 
         <div className="flex gap-2 mb-6">
           <button onClick={() => setActiveTab('sign')} className={tabClass('sign')} style={{ marginBottom: 0 }}>
-            Подписание договоров
-            {signOrders.filter(o => !contracts[o.id]?.directorSigned).length > 0 && (
+            Финальное подписание
+            {signOrders.length > 0 && (
               <span className="ml-2 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">
-                {signOrders.filter(o => !contracts[o.id]?.directorSigned).length}
+                {signOrders.length}
               </span>
             )}
           </button>
@@ -176,7 +191,7 @@ export default function Director() {
           </button>
         </div>
 
-        {/* ── Вкладка: подписание ─────────────────────────────────────────── */}
+        {/* ── Финальное подписание ────────────────────────────────────────── */}
         {activeTab === 'sign' && (
           signOrders.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
@@ -184,21 +199,20 @@ export default function Director() {
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
-              <p className="text-gray-400">Нет договоров для подписания</p>
+              <p className="text-gray-400">Нет договоров ожидающих финальной подписи</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
               {signOrders.map(order => {
                 const contract = contracts[order.id];
-                const alreadySigned = contract?.directorSigned;
                 return (
                   <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                       <h3 className="font-bold text-[#0A2E5C]" style={{ margin: 0, fontSize: '1rem' }}>
                         Заявка #{order.orderNumber}
                       </h3>
-                      <span className={`text-xs font-semibold px-3 py-1 rounded-full ${alreadySigned ? 'bg-green-100 text-green-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                        {alreadySigned ? 'Вы подписали' : 'Ожидает вашей подписи'}
+                      <span className="text-xs font-semibold px-3 py-1 rounded-full bg-indigo-100 text-indigo-700">
+                        Ожидает финальной подписи
                       </span>
                     </div>
 
@@ -211,17 +225,25 @@ export default function Director() {
                         <p className="text-xs text-gray-400 mb-0.5" style={{ margin: '0 0 2px' }}>Лаборатория</p>
                         <p className="text-sm font-semibold text-gray-700" style={{ margin: 0 }}>#{order.labId}</p>
                       </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-0.5" style={{ margin: '0 0 2px' }}>Номер договора</p>
+                        <p className="text-sm font-semibold text-gray-700" style={{ margin: 0 }}>{contract?.contractNumber || '—'}</p>
+                      </div>
                     </div>
 
-                    {/* Прогресс параллельных подписей */}
+                    {/* Прогресс всех 5 подписей */}
                     {contract && (
                       <div className="flex gap-2 mb-4 flex-wrap">
                         {[
                           { label: 'Согласующий', signed: contract.approverSigned },
                           { label: 'Финансист',   signed: contract.financierSigned },
                           { label: 'Директор',    signed: contract.directorSigned },
+                          { label: 'Клиент',      signed: contract.clientSigned },
+                          { label: 'Ген.директор', signed: contract.genDirectorSigned },
                         ].map(({ label, signed }) => (
-                          <span key={label} className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${signed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                          <span key={label} className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${
+                            signed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'
+                          }`}>
                             {signed
                               ? <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/></svg>
                               : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>
@@ -263,17 +285,15 @@ export default function Director() {
                       </div>
                     ) : (
                       <div className="flex gap-2">
-                        {!alreadySigned && (
-                          <button onClick={() => handleSign(order.id)} disabled={signing === order.id}
-                            className="px-4 py-2 bg-[#0A2E5C] hover:bg-[#0d3a73] disabled:bg-gray-200 text-white font-medium rounded-lg border-none cursor-pointer text-sm transition-colors flex items-center gap-2"
-                            style={{ marginBottom: 0 }}>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                            {signing === order.id ? 'Подписание...' : 'Подписать ЭЦП'}
-                          </button>
-                        )}
+                        <button onClick={() => handleSign(order.id)} disabled={signing === order.id}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-200 text-white font-medium rounded-lg border-none cursor-pointer text-sm transition-colors flex items-center gap-2"
+                          style={{ marginBottom: 0 }}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                          {signing === order.id ? 'Подписание...' : 'Подписать ЭЦП (финал)'}
+                        </button>
                         <button onClick={() => setShowReject(order.id)}
                           className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-lg border-none cursor-pointer text-sm transition-colors flex items-center gap-2"
                           style={{ marginBottom: 0 }}>
@@ -291,14 +311,10 @@ export default function Director() {
           )
         )}
 
-        {/* ── Вкладка: направить в лабораторию ───────────────────────────── */}
+        {/* ── Направить на исполнение ─────────────────────────────────────── */}
         {activeTab === 'assign' && (
           assignOrders.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center shadow-sm">
-              <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
-                <rect x="9" y="3" width="6" height="4" rx="1"/>
-              </svg>
               <p className="text-gray-400">Нет заявок ожидающих направления</p>
             </div>
           ) : (
@@ -313,7 +329,7 @@ export default function Director() {
                       Ожидает направления
                     </span>
                   </div>
-                  <div className="bg-gray-50 rounded-xl p-4 mb-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-4 mb-4 grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-xs text-gray-400 mb-0.5" style={{ margin: '0 0 2px' }}>Плановая дата</p>
                       <p className="text-sm font-semibold text-gray-700" style={{ margin: 0 }}>{formatDate(order.dueDate)}</p>
@@ -344,7 +360,7 @@ export default function Director() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
                       </svg>
-                      {assigning === order.id ? 'Направление...' : 'Направить на исполнение'}
+                      {assigning === order.id ? 'Направление...' : 'Направить'}
                     </button>
                   </div>
                 </div>

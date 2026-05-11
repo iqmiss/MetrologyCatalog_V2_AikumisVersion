@@ -1,5 +1,6 @@
 package com.catalog.models;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 @Entity
@@ -19,10 +20,11 @@ public class Notification {
     @Column(nullable = false)
     private String message;
 
-    @Column(name = "notification_type", columnDefinition = "ENUM('order_status','document_ready','reminder')")
+    @Column(name = "notification_type", columnDefinition = "ENUM('order_status','document_ready','reminder','approval_required','payment_received','assigned_to_lab','receipt_uploaded')")
     private String notificationType;
 
     @Column(name = "is_read")
+    @JsonProperty("isRead")
     private boolean isRead;
 
     @Column(name = "read_at")
@@ -39,19 +41,16 @@ public class Notification {
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
-
     public int getUserId() { return userId; }
     public void setUserId(int userId) { this.userId = userId; }
-
     public Integer getOrderId() { return orderId; }
     public void setOrderId(Integer orderId) { this.orderId = orderId; }
-
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
-
     public String getNotificationType() { return notificationType; }
     public void setNotificationType(String notificationType) { this.notificationType = notificationType; }
 
+    @JsonProperty("isRead")
     public boolean isRead() { return isRead; }
     public void setRead(boolean read) { isRead = read; }
 

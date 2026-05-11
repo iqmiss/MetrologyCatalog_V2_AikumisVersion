@@ -16,7 +16,7 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(nullable = false, columnDefinition = "ENUM('client','metrolog','manager','director','financier','approver','admin')")
+    @Column(nullable = false, columnDefinition = "ENUM('client','metrolog','manager','director','gen_director','financier','approver','admin')")
     private String role;
 
     @Column(name = "company_id")
@@ -72,7 +72,7 @@ public class User {
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
-    
+
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { isActive = active; }
 

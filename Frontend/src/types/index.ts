@@ -1,7 +1,7 @@
 export interface User {
   id: number;
   email: string;
-  role: 'client' | 'metrolog' | 'manager' | 'director' | 'financier' | 'approver' | 'admin';
+  role: 'client' | 'metrolog' | 'manager' | 'director' | 'gen_director' | 'financier' | 'approver' | 'admin';
   fullName: string;
   phone?: string;
   companyId?: number;
@@ -32,7 +32,7 @@ export interface Service {
   name: string;
   description?: string;
   measurementType: string;
-  price: number;
+  price?: number | null;
   durationDays: number;
   labId: number;
   isActive: boolean;
@@ -42,9 +42,11 @@ export interface Service {
 
 export type OrderStatus =
   | 'pending_contract'
+  | 'revision'
   | 'awaiting_approval'
   | 'awaiting_director'
   | 'awaiting_payment'
+  | 'pending_delivery'
   | 'awaiting_delivery'
   | 'received_in_lab'
   | 'in_work'
@@ -60,10 +62,18 @@ export interface Order {
   clientId: number;
   serviceId: number;
   labId: number;
+  assignedLabId?: number;
+  assignedAt?: string;
   status: OrderStatus;
-  totalPrice: number;
+  // null = финансист ещё не объявил цену
+  price?: number | null;
   dueDate?: string;
   metrologistId?: number;
+  clientComment?: string;
+  managerComment?: string;
+  invoiceSent?: boolean;
+  paymentReceiptName?: string;
+  receiptUploadedAt?: string;
 }
 
 export interface OrderItem {
@@ -73,7 +83,6 @@ export interface OrderItem {
   model: string;
   serialNumber: string;
   quantity: number;
-  unitPrice: number;
 }
 
 export type ContractStatus =
@@ -89,23 +98,25 @@ export interface Contract {
   id: number;
   orderId: number;
   contractNumber: string;
+  registrationNumber?: string;
+  contractFileName?: string;
   filePath?: string;
   status: ContractStatus;
-
-  clientSigned: boolean;
-  clientSignedAt?: string;
-  clientSignedBy?: number;
-
   directorSigned: boolean;
   directorSignedAt?: string;
-  directorSignedBy?: number;
-
+  approverSigned: boolean;
+  approverSignedAt?: string;
+  financierSigned: boolean;
+  financierSignedAt?: string;
+  clientSigned: boolean;
+  clientSignedAt?: string;
+  genDirectorSigned: boolean;
+  genDirectorSignedAt?: string;
+  rejectedByRole?: string;
+  rejectedReason?: string;
   annulledAt?: string;
-  annulledBy?: number;
   annulledReason?: string;
-
   terminatedAt?: string;
-  terminatedBy?: number;
   terminatedReason?: string;
 }
 
@@ -130,12 +141,21 @@ export interface Device {
   nextVerificationDate?: string;
 }
 
+export type NotificationType =
+  | 'order_status'
+  | 'document_ready'
+  | 'reminder'
+  | 'approval_required'
+  | 'payment_received'
+  | 'assigned_to_lab'
+  | 'receipt_uploaded';
+
 export interface Notification {
   id: number;
   userId: number;
   orderId?: number;
   message: string;
-  notificationType: 'order_status' | 'document_ready' | 'reminder' | 'approval_required';
+  notificationType: NotificationType;
   isRead: boolean;
   readAt?: string;
 }

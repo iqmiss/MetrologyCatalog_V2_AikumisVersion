@@ -27,9 +27,7 @@ export default function CreateOrder() {
     clientComment: '',
   });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     try {
@@ -38,15 +36,11 @@ export default function CreateOrder() {
         serviceApi.getAll(),
         api.get('/laboratories'),
       ];
-      if (user?.role === 'manager') {
-        requests.push(userApi.getClients());
-      }
+      if (user?.role === 'manager') requests.push(userApi.getClients());
       const results = await Promise.all(requests);
       setServices(results[0].data);
       setLaboratories(results[1].data);
-      if (user?.role === 'manager' && results[2]) {
-        setClients(results[2].data);
-      }
+      if (user?.role === 'manager' && results[2]) setClients(results[2].data);
     } catch {
       setError('Ошибка при загрузке данных');
     } finally {
@@ -75,14 +69,10 @@ export default function CreateOrder() {
     }
 
     try {
-      const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
-      if (!selectedService) { setError('Услуга не найдена'); return; }
-
       const orderPayload = {
         clientId: user?.role === 'manager' ? selectedClientId : user?.id,
         serviceId: parseInt(formData.serviceId),
         labId: parseInt(formData.labId),
-        totalPrice: selectedService.price * parseInt(formData.quantity),
         dueDate: formData.dueDate,
         clientComment: formData.clientComment || null,
         orderItems: [{
@@ -90,7 +80,6 @@ export default function CreateOrder() {
           model: formData.model,
           serialNumber: formData.serialNumber,
           quantity: parseInt(formData.quantity),
-          unitPrice: selectedService.price,
         }],
       };
 
@@ -103,7 +92,6 @@ export default function CreateOrder() {
   };
 
   const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
-  const totalPrice = selectedService ? selectedService.price * parseInt(formData.quantity || '1') : 0;
 
   const inputClass = "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white";
   const selectClass = "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white cursor-pointer";
@@ -153,7 +141,6 @@ export default function CreateOrder() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
-          {/* Выбор клиента — только для менеджера */}
           {user?.role === 'manager' && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
               <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
@@ -161,24 +148,17 @@ export default function CreateOrder() {
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Выберите клиента *</label>
-                <select
-                  value={selectedClientId || ''}
-                  onChange={e => setSelectedClientId(parseInt(e.target.value))}
-                  className={selectClass}
-                  style={{ fontFamily: 'inherit', marginBottom: 0 }}
-                >
+                <select value={selectedClientId || ''} onChange={e => setSelectedClientId(parseInt(e.target.value))}
+                  className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
                   <option value="">— Выберите клиента —</option>
                   {clients.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.fullName} ({c.email})
-                    </option>
+                    <option key={c.id} value={c.id}>{c.fullName} ({c.email})</option>
                   ))}
                 </select>
               </div>
             </div>
           )}
 
-          {/* Выбор услуги */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Выберите услугу
@@ -186,11 +166,12 @@ export default function CreateOrder() {
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Услуга *</label>
-                <select name="serviceId" value={formData.serviceId} onChange={handleChange} required className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
+                <select name="serviceId" value={formData.serviceId} onChange={handleChange} required
+                  className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
                   <option value="">— Выберите услугу —</option>
                   {services.map(s => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.measurementType}) — {s.price.toLocaleString()} ₸
+                      {s.name} ({s.measurementType})
                     </option>
                   ))}
                 </select>
@@ -210,7 +191,6 @@ export default function CreateOrder() {
             </div>
           </div>
 
-          {/* Информация о приборе */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Информация о приборе
@@ -243,7 +223,6 @@ export default function CreateOrder() {
             </div>
           </div>
 
-          {/* Место и дата */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Место и дата
@@ -251,7 +230,8 @@ export default function CreateOrder() {
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Лаборатория *</label>
-                <select name="labId" value={formData.labId} onChange={handleChange} required className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
+                <select name="labId" value={formData.labId} onChange={handleChange} required
+                  className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
                   <option value="">— Выберите лабораторию —</option>
                   {laboratories.map(lab => (
                     <option key={lab.id} value={lab.id}>{lab.name} ({lab.city})</option>
@@ -261,13 +241,12 @@ export default function CreateOrder() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Плановая дата сдачи *</label>
                 <input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange}
-                  required className={inputClass}
-                  style={{ fontFamily: 'inherit', marginBottom: 0 }} />
+                  required min={new Date().toISOString().split('T')[0]} max="2099-12-31"
+                  className={inputClass} style={{ fontFamily: 'inherit', marginBottom: 0 }} />
               </div>
             </div>
           </div>
 
-          {/* Комментарий */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
             <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
               Комментарий
@@ -276,46 +255,17 @@ export default function CreateOrder() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Дополнительные пожелания (необязательно)
               </label>
-              <textarea
-                name="clientComment"
-                value={formData.clientComment}
-                onChange={handleChange}
+              <textarea name="clientComment" value={formData.clientComment} onChange={handleChange}
                 placeholder="Опишите особенности приборов, срочность, дополнительные требования..."
                 rows={3}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white resize-none"
-                style={{ fontFamily: 'inherit', marginBottom: 0 }}
-              />
+                style={{ fontFamily: 'inherit', marginBottom: 0 }} />
             </div>
           </div>
 
-          {/* Итого */}
-          {selectedService && (
-            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-              <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
-                Итого
-              </p>
-              <div className="flex flex-col gap-2">
-                <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-sm text-gray-500">Стоимость услуги</span>
-                  <span className="text-sm font-medium text-gray-700">{selectedService.price.toLocaleString()} ₸</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                  <span className="text-sm text-gray-500">Количество</span>
-                  <span className="text-sm font-medium text-gray-700">{formData.quantity} шт.</span>
-                </div>
-                <div className="flex justify-between items-center py-3">
-                  <span className="text-base font-bold text-[#0A2E5C]">Итого</span>
-                  <span className="text-xl font-bold text-[#00B2FF]">{totalPrice.toLocaleString()} ₸</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <button
-            type="submit"
+          <button type="submit"
             className="w-full py-4 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-semibold rounded-xl border-none cursor-pointer text-base transition-colors"
-            style={{ marginBottom: 0 }}
-          >
+            style={{ marginBottom: 0 }}>
             Создать заявку
           </button>
         </form>

@@ -17,9 +17,10 @@ import NotFound from './components/NotFound';
 import Dashboard from './pages/Dashboard';
 import Reports from './pages/Reports';
 import AdminUsers from './pages/AdminUsers';
+import Financier from './pages/Financier';
+import GenDirector from './pages/GenDirector';
 import Approver from './pages/Approver';
 import Director from './pages/Director';
-import Financier from './pages/Financier';
 import './App.css';
 
 const NO_HEADER_PATHS = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
@@ -27,13 +28,11 @@ const NO_HEADER_PATHS = ['/', '/login', '/register', '/forgot-password', '/reset
 function AppLayout() {
   const { isAuthenticated } = useAuthStore();
   const location = useLocation();
-
   const showHeader = isAuthenticated && !NO_HEADER_PATHS.includes(location.pathname);
 
   return (
     <>
       {showHeader && <Header />}
-
       <main className={showHeader ? 'md:ml-[240px] mt-0' : ''}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -48,9 +47,10 @@ function AppLayout() {
           <Route path="/dashboard" element={<ProtectedRoute requiredRoles={['manager']}><Dashboard /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute requiredRoles={['manager']}><Reports /></ProtectedRoute>} />
           <Route path="/admin/users" element={<ProtectedRoute requiredRoles={['admin']}><AdminUsers /></ProtectedRoute>} />
+          <Route path="/financier" element={<ProtectedRoute requiredRoles={['financier']}><Financier /></ProtectedRoute>} />
           <Route path="/approver" element={<ProtectedRoute requiredRoles={['approver']}><Approver /></ProtectedRoute>} />
           <Route path="/director" element={<ProtectedRoute requiredRoles={['director']}><Director /></ProtectedRoute>} />
-          <Route path="/financier" element={<ProtectedRoute requiredRoles={['financier']}><Financier /></ProtectedRoute>} />
+          <Route path="/gen-director" element={<ProtectedRoute requiredRoles={['gen_director']}><GenDirector /></ProtectedRoute>} />
 
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -64,11 +64,7 @@ function AppLayout() {
 
 function App() {
   const { loadFromStorage } = useAuthStore();
-
-  useEffect(() => {
-    loadFromStorage();
-  }, []);
-
+  useEffect(() => { loadFromStorage(); }, []);
   return (
     <BrowserRouter>
       <AppLayout />

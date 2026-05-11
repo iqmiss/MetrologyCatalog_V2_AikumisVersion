@@ -16,12 +16,9 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-// Конфигурация Spring Security
-// Определяет какие endpoints открыты публично, какие требуют авторизации
-// Включает JWT фильтр для проверки токенов
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Включает @PreAuthorize на контроллерах
+@EnableMethodSecurity
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
@@ -33,44 +30,54 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // Отключаем CSRF — не нужен для REST API с JWT
             .csrf(csrf -> csrf.disable())
-
-            // Настраиваем CORS — разрешаем запросы с фронтенда
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-            // Настраиваем авторизацию по endpoints
             .authorizeHttpRequests(auth -> auth
-                // Публичные endpoints — доступны без токена
+                // Публичные endpoints
                 .requestMatchers("/api/auth/login").permitAll()
                 .requestMatchers("/api/auth/register").permitAll()
                 .requestMatchers("/api/auth/forgot-password").permitAll()
                 .requestMatchers("/api/auth/reset-password").permitAll()
                 .requestMatchers("/api/services").permitAll()
                 .requestMatchers("/api/services/**").permitAll()
-                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/client").hasRole("CLIENT")
-                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/director").hasRole("DIRECTOR")
-                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/approve").hasAnyRole("APPROVER")
-                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/reject").hasAnyRole("APPROVER")
-                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/submit").hasRole("MANAGER")
-                .requestMatchers(HttpMethod.POST, "/api/contracts/*").hasRole("MANAGER")
 
-                // Все остальные endpoints требуют авторизации
+                // Подписание договора — каждая роль свой endpoint
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/client")
+                    .hasRole("CLIENT")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/approver")
+                    .hasRole("APPROVER")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/financier")
+                    .hasRole("FINANCIER")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/director")
+                    .hasRole("DIRECTOR")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/gen_director")
+                    .hasRole("GEN_DIRECTOR")
+
+                // Отклонение — любая из подписывающих ролей
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/reject")
+                    .hasAnyRole("APPROVER", "FINANCIER", "DIRECTOR", "GEN_DIRECTOR")
+
+                // Создание и отправка договора — менеджер
+                .requestMatchers(HttpMethod.POST, "/api/contracts/*")
+                    .hasRole("MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/contracts/*/submit")
+                    .hasRole("MANAGER")
+
+                // Направление в лабораторию — директор или ген.директор
+                .requestMatchers(HttpMethod.PUT, "/api/orders/*/assign-lab")
+                    .hasAnyRole("DIRECTOR", "GEN_DIRECTOR")
+
+                // Все остальные — авторизация обязательна
                 .anyRequest().authenticated()
             )
-
-            // Stateless сессия — не храним сессии на сервере, только JWT
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-
-            // Добавляем наш JWT фильтр перед стандартным фильтром аутентификации
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // Настройка CORS — разрешаем запросы с React фронтенда
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

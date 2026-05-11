@@ -187,8 +187,8 @@ export default function Queue() {
         ) : (
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
             {/* Заголовок таблицы */}
-            <div className="hidden md:grid grid-cols-[1fr_100px_160px_130px_220px] gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100">
-              {['№ Заявки', 'Клиент', 'Статус', 'Стоимость', 'Действия'].map(col => (
+            <div className="hidden md:grid grid-cols-[1fr_100px_160px_220px] gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100">
+              {['№ Заявки', 'Клиент', 'Статус', 'Действия'].map(col => (
                 <div key={col} className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider">{col}</div>
               ))}
             </div>
@@ -199,7 +199,7 @@ export default function Queue() {
                 const sc = getStatusClass(order.status);
                 return (
                   <div key={order.id}
-                    className="grid grid-cols-1 md:grid-cols-[1fr_100px_160px_130px_220px] gap-4 px-6 py-4 hover:bg-gray-50/50 transition-colors items-center">
+                    className="grid grid-cols-1 md:grid-cols-[1fr_100px_160px_220px] gap-4 px-6 py-4 hover:bg-gray-50/50 transition-colors items-center">
 
                     {/* № заявки */}
                     <div className="font-bold text-[#0A2E5C]">#{order.orderNumber}</div>
@@ -212,11 +212,6 @@ export default function Queue() {
                       <span className={`text-xs font-semibold px-3 py-1 rounded-full ${sc.bg} ${sc.text}`}>
                         {statusLabels[order.status] || order.status}
                       </span>
-                    </div>
-
-                    {/* Стоимость */}
-                    <div className="text-sm font-semibold text-[#0A2E5C]">
-                      {order.totalPrice.toLocaleString()} ₸
                     </div>
 
                     {/* Действия */}
