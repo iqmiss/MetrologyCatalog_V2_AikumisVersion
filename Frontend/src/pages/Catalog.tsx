@@ -161,8 +161,14 @@ export default function Catalog() {
                   {service.description}
                 </p>
 
-                {/* Детали услуги — срок, лаборатория и нормативный документ */}
+                {/* Детали услуги — цена, срок, лаборатория и нормативный документ */}
                 <div className="bg-gray-50 rounded-xl p-4 mb-4 flex flex-col gap-2.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-400">Стоимость</span>
+                    <span className="text-sm font-bold text-[#0A2E5C]">
+                      {service.price != null ? `${service.price.toLocaleString()} ₸` : 'По запросу'}
+                    </span>
+                  </div>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-400">Срок</span>
                     <span className="text-sm font-semibold text-gray-700">{service.durationDays} рабочих дней</span>
