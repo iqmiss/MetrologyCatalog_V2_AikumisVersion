@@ -107,6 +107,12 @@
         <version>0.11.5</version>
         <scope>runtime</scope>
     </dependency>
+
+    <!-- Flyway — версионирование миграций базы данных -->
+    <dependency>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-mysql</artifactId>
+    </dependency>
 </dependencies>
 
 	<build>
