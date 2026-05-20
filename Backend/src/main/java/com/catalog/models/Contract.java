@@ -91,6 +91,18 @@ public class Contract {
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "metrolog_confirmed")
+    private boolean metrologConfirmed = false;
+
+    @Column(name = "financier_confirmed")
+    private boolean financierConfirmed = false;
+
+    @Column(name = "yurist_confirmed")
+    private boolean yuristConfirmed = false;
+
+    @Column(name = "confirmations_requested")
+    private boolean confirmationsRequested = false;
+
     public boolean isTrioSigned() {
         return directorSigned && approverSigned && financierSigned;
     }
@@ -175,4 +187,17 @@ public class Contract {
     public String getTerminatedReason() { return terminatedReason; }
     public void setTerminatedReason(String v) { this.terminatedReason = v; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public boolean isMetrologConfirmed() { return metrologConfirmed; }
+    public void setMetrologConfirmed(boolean v) { this.metrologConfirmed = v; }
+    public boolean isFinancierConfirmed() { return financierConfirmed; }
+    public void setFinancierConfirmed(boolean v) { this.financierConfirmed = v; }
+    public boolean isYuristConfirmed() { return yuristConfirmed; }
+    public void setYuristConfirmed(boolean v) { this.yuristConfirmed = v; }
+    public boolean isConfirmationsRequested() { return confirmationsRequested; }
+    public void setConfirmationsRequested(boolean v) { this.confirmationsRequested = v; }
+
+    public boolean isAllConfirmed() {
+        return metrologConfirmed && financierConfirmed && yuristConfirmed;
+}
 }

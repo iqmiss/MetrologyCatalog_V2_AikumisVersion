@@ -391,6 +391,86 @@ public class ContractController {
         }
     }
 
+    // ── Confirmation round-trip (Step 7) ─────────────────────────────────────
+
+    // PUT /api/contracts/{orderId}/request-confirmations
+    // Бухгалтер requests confirmations from metrolog, financier, yurist
+    @PutMapping("/{orderId}/request-confirmations")
+    public ResponseEntity<?> requestConfirmations(@PathVariable int orderId) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+
+            contract.setMetrologConfirmed(false);
+            contract.setFinancierConfirmed(false);
+            contract.setYuristConfirmed(false);
+            contract.setConfirmationsRequested(true);
+            contractRepository.save(contract);
+
+            Order order = orderRepository.findById(orderId).orElse(null);
+            if (order != null)
+                notificationService.notifyInternalReviewersConfirmationRequested(
+                    orderId, order.getOrderNumber());
+
+            return ResponseEntity.ok(copyWithoutFile(contract));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при запросе подтверждений"));
+        }
+    }
+
+    // PUT /api/contracts/{orderId}/confirm?role=metrolog
+    // One of the 3 roles confirms
+    @PutMapping("/{orderId}/confirm")
+    public ResponseEntity<?> confirmByRole(
+            @PathVariable int orderId,
+            @RequestParam String role) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+            if (!contract.isConfirmationsRequested())
+                return ResponseEntity.badRequest().body(Map.of("message", "Подтверждение ещё не запрошено"));
+
+            switch (role.toLowerCase()) {
+                case "metrolog" -> contract.setMetrologConfirmed(true);
+                case "financier" -> contract.setFinancierConfirmed(true);
+                case "yurist" -> contract.setYuristConfirmed(true);
+                default -> { return ResponseEntity.badRequest().body(Map.of("message", "Неизвестная роль: " + role)); }
+            }
+            contractRepository.save(contract);
+
+            if (contract.isAllConfirmed()) {
+                Order order = orderRepository.findById(orderId).orElse(null);
+                if (order != null)
+                    notificationService.notifySignerForFinalSign(orderId, order.getOrderNumber());
+            }
+
+            return ResponseEntity.ok(copyWithoutFile(contract));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при подтверждении"));
+        }
+    }
+
+    // PUT /api/contracts/{orderId}/reject-confirmation?role=metrolog
+    // Any of the 3 rejects — resets all confirmations
+    @PutMapping("/{orderId}/reject-confirmation")
+    public ResponseEntity<?> rejectConfirmation(
+            @PathVariable int orderId,
+            @RequestParam String role) {
+        try {
+            Contract contract = contractRepository.findByOrderId(orderId).orElse(null);
+            if (contract == null) return notFound();
+
+            contract.setMetrologConfirmed(false);
+            contract.setFinancierConfirmed(false);
+            contract.setYuristConfirmed(false);
+            contract.setConfirmationsRequested(false);
+            contractRepository.save(contract);
+
+            return ResponseEntity.ok(copyWithoutFile(contract));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Ошибка при отклонении подтверждения"));
+        }
+    }
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private void checkTrioAndNotifyClient(Contract contract, int orderId) {

@@ -235,4 +235,27 @@ public class NotificationService {
         );
     }
 
+        /** Бухгалтер запросил подтверждения → уведомляем metrolog, financier, yurist */
+    public void notifyInternalReviewersConfirmationRequested(Integer orderId, String orderNumber) {
+        String message = "Требуется ваше подтверждение по заявке " + orderNumber;
+        userRepository.findByRole("metrolog").forEach(u ->
+            create(u.getId(), orderId, message, "approval_required")
+        );
+        userRepository.findByRole("financier").forEach(u ->
+            create(u.getId(), orderId, message, "approval_required")
+        );
+        userRepository.findByRole("yurist").forEach(u ->
+            create(u.getId(), orderId, message, "approval_required")
+        );
+    }
+
+    /** Все 3 подтвердили → уведомляем шефа/подписанта */
+    public void notifySignerForFinalSign(Integer orderId, String orderNumber) {
+        userRepository.findByRole("gen_director").forEach(u ->
+            create(u.getId(), orderId,
+                "Все стороны подтвердили договор по заявке " + orderNumber + ". Ожидается ваша подпись.",
+                "approval_required")
+        );
+    }
+
 }
