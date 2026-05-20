@@ -71,6 +71,9 @@ export const orderApi = {
     api.put(`/orders/${id}/notify-director`),
   setPrice: (id: number, price: number) =>
     api.put(`/orders/${id}/set-price`, { price }),
+  getFields: (id: number) => api.get(`/orders/${id}/fields`),
+  saveFields: (id: number, fields: any[]) => api.post(`/orders/${id}/fields`, fields),
+  toggleClientEdit: (id: number) => api.put(`/orders/${id}/toggle-client-edit`),
 };
 
 export const pdfApi = {
@@ -105,6 +108,9 @@ export const contractApi = {
     api.put(`/contracts/${orderId}/terminate`, { userId, reason }),
   download: (orderId: number) =>
     api.get(`/contracts/${orderId}/download`, { responseType: 'blob' }),
+  requestConfirmations: (orderId: number) => api.put(`/contracts/${orderId}/request-confirmations`),
+  confirm: (orderId: number, role: string) => api.put(`/contracts/${orderId}/confirm`, null, { params: { role } }),
+  rejectConfirmation: (orderId: number, role: string) => api.put(`/contracts/${orderId}/reject-confirmation`, null, { params: { role } }),
 };
 
 export const notificationApi = {
@@ -127,6 +133,33 @@ export const userApi = {
   getProfile: () => api.get('/profile'),
   updateProfile: (data: any) => api.put('/profile', data),
   getClients: () => api.get('/users/clients'),
+};
+
+export const subserviceApi = {
+  getByServiceId: (serviceId: number) => api.get('/subservices', { params: { serviceId } }),
+  getById: (id: number) => api.get(`/subservices/${id}`),
+  getFields: (id: number) => api.get(`/subservices/${id}/fields`),
+};
+
+export const chatApi = {
+  getMessages: (orderId: number) => api.get(`/chat/${orderId}`),
+  sendMessage: (orderId: number, data: { messageText?: string; attachmentBase64?: string; attachmentName?: string }) =>
+    api.post(`/chat/${orderId}`, data),
+  markAsRead: (orderId: number) => api.put(`/chat/${orderId}/read`),
+};
+
+export const docCommentApi = {
+  getComments: (orderId: number) => api.get(`/doc-comments/${orderId}`),
+  addComment: (orderId: number, data: { highlightedText?: string; commentText: string }) =>
+    api.post(`/doc-comments/${orderId}`, data),
+  resolve: (id: number) => api.put(`/doc-comments/${id}/resolve`),
+};
+
+export const demandApi = {
+  getDemands: (orderId: number) => api.get(`/demands/${orderId}`),
+  createDemand: (orderId: number, demandText: string) =>
+    api.post(`/demands/${orderId}`, { demandText }),
+  fulfill: (id: number) => api.put(`/demands/${id}/fulfill`),
 };
 
 export default api;

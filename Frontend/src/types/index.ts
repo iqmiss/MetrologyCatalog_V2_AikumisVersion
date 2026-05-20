@@ -1,9 +1,10 @@
 export interface User {
   id: number;
   email: string;
-  role: 'client' | 'metrolog' | 'manager' | 'director' | 'gen_director' | 'financier' | 'approver' | 'admin';
+  role: 'client' | 'metrolog' | 'manager' | 'director' | 'gen_director' | 'financier' | 'approver' | 'admin' | 'yurist';
   fullName: string;
   phone?: string;
+  iin?: string;
   companyId?: number;
   labId?: number;
   isActive: boolean;
@@ -38,6 +39,72 @@ export interface Service {
   isActive: boolean;
   standard?: string;
   labName?: string;
+  code?: string;
+}
+
+export interface Subservice {
+  id: number;
+  serviceId: number;
+  name: string;
+  code: string;
+  description?: string;
+  fullCode?: string;
+  isActive: boolean;
+}
+
+export interface SubserviceField {
+  id: number;
+  subserviceId: number;
+  fieldKey: string;
+  labelRu: string;
+  fieldType: 'text' | 'number' | 'date' | 'select' | 'file';
+  required: boolean;
+  optionsJson?: string;
+  sortOrder: number;
+  isRepeating: boolean;
+}
+
+export interface ApplicationFieldValue {
+  id: number;
+  orderId: number;
+  fieldKey: string;
+  fieldValue: string;
+  rowIndex: number;
+  filledByRole: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  orderId: number;
+  senderId: number;
+  senderRole: string;
+  messageText?: string;
+  attachmentBase64?: string;
+  attachmentName?: string;
+  sentAt: string;
+  read: boolean;
+}
+
+export interface DocumentComment {
+  id: number;
+  orderId: number;
+  commenterId: number;
+  commenterRole: string;
+  highlightedText?: string;
+  commentText: string;
+  resolved: boolean;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface OrderDemand {
+  id: number;
+  orderId: number;
+  createdBy: number;
+  demandText: string;
+  status: 'open' | 'fulfilled';
+  createdAt: string;
+  fulfilledAt?: string;
 }
 
 export type OrderStatus =
@@ -65,7 +132,6 @@ export interface Order {
   assignedLabId?: number;
   assignedAt?: string;
   status: OrderStatus;
-  // null = финансист ещё не объявил цену
   price?: number | null;
   dueDate?: string;
   metrologistId?: number;
@@ -74,6 +140,14 @@ export interface Order {
   invoiceSent?: boolean;
   paymentReceiptName?: string;
   receiptUploadedAt?: string;
+  subserviceId?: number;
+  secondaryStatus?: string;
+  applicationCode?: string;
+  serviceAddress?: string;
+  responsibleDepartment?: string;
+  signerUserId?: number;
+  clientEditEnabled?: boolean;
+  formLocked?: boolean;
 }
 
 export interface OrderItem {
@@ -118,6 +192,10 @@ export interface Contract {
   annulledReason?: string;
   terminatedAt?: string;
   terminatedReason?: string;
+  metrologConfirmed?: boolean;
+  financierConfirmed?: boolean;
+  yuristConfirmed?: boolean;
+  confirmationsRequested?: boolean;
 }
 
 export interface Result {
@@ -148,7 +226,11 @@ export type NotificationType =
   | 'approval_required'
   | 'payment_received'
   | 'assigned_to_lab'
-  | 'receipt_uploaded';
+  | 'receipt_uploaded'
+  | 'demand_created'
+  | 'demand_fulfilled'
+  | 'doc_comment_added'
+  | 'confirmation_requested';
 
 export interface Notification {
   id: number;
