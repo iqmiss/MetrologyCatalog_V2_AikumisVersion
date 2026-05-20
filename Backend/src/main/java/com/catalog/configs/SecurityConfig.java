@@ -43,6 +43,8 @@ public class SecurityConfig {
 
                 .requestMatchers("/api/subservices").permitAll()
                 .requestMatchers("/api/subservices/**").permitAll()
+                .requestMatchers("/api/chat/**").authenticated()
+
 
                 // Подписание договора — каждая роль свой endpoint
                 .requestMatchers(HttpMethod.PUT, "/api/contracts/*/sign/client")
