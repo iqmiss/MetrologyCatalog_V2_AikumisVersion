@@ -33,22 +33,25 @@ public class OrderController {
     private final LaboratoryRepository laboratoryRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    private final com.catalog.repository.ApplicationFieldValueRepository applicationFieldValueRepository;
 
     public OrderController(OrderRepository orderRepository,
-                           OrderItemRepository orderItemRepository,
-                           UserRepository userRepository,
-                           EmailService emailService,
-                           ContractRepository contractRepository,
-                           LaboratoryRepository laboratoryRepository,
-                           NotificationService notificationService) {
-        this.orderRepository = orderRepository;
-        this.orderItemRepository = orderItemRepository;
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-        this.contractRepository = contractRepository;
-        this.laboratoryRepository = laboratoryRepository;
-        this.notificationService = notificationService;
-    }
+                               OrderItemRepository orderItemRepository,
+                               UserRepository userRepository,
+                               EmailService emailService,
+                               ContractRepository contractRepository,
+                               LaboratoryRepository laboratoryRepository,
+                               NotificationService notificationService,
+                               com.catalog.repository.ApplicationFieldValueRepository applicationFieldValueRepository) {
+            this.orderRepository = orderRepository;
+            this.orderItemRepository = orderItemRepository;
+            this.userRepository = userRepository;
+            this.emailService = emailService;
+            this.contractRepository = contractRepository;
+            this.laboratoryRepository = laboratoryRepository;
+            this.notificationService = notificationService;
+            this.applicationFieldValueRepository = applicationFieldValueRepository;
+        }
 
     @GetMapping
     public ResponseEntity<?> getAllOrders(@RequestParam(required = false) Integer labId) {
@@ -464,6 +467,65 @@ public class OrderController {
         }
     }
 
+// GET /api/orders/{id}/fields
+    // Returns all field values for an order
+    @GetMapping("/{id}/fields")
+    public ResponseEntity<?> getFieldValues(@PathVariable int id) {
+        try {
+            return ResponseEntity.ok(
+                applicationFieldValueRepository.findByOrderId(id)
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(errorResponse("Ошибка при получении полей"));
+        }
+    }
+
+    // POST /api/orders/{id}/fields
+    // Client saves field values
+    @PostMapping("/{id}/fields")
+    public ResponseEntity<?> saveFieldValues(
+            @PathVariable int id,
+            @RequestBody List<FieldValueRequest> fields) {
+        try {
+            Order order = orderRepository.findById(id).orElse(null);
+            if (order == null) return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
+
+            applicationFieldValueRepository.deleteByOrderId(id);
+
+            for (FieldValueRequest fvr : fields) {
+                com.catalog.models.ApplicationFieldValue afv = new com.catalog.models.ApplicationFieldValue();
+                afv.setOrderId(id);
+                afv.setFieldKey(fvr.fieldKey);
+                afv.setFieldValue(fvr.fieldValue);
+                afv.setRowIndex(fvr.rowIndex != null ? fvr.rowIndex : 0);
+                afv.setFilledByRole(fvr.filledByRole != null ? fvr.filledByRole : "client");
+                afv.setUpdatedAt(LocalDateTime.now());
+                applicationFieldValueRepository.save(afv);
+            }
+
+            return ResponseEntity.ok(applicationFieldValueRepository.findByOrderId(id));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(errorResponse("Ошибка при сохранении полей"));
+        }
+    }
+
+    // PUT /api/orders/{id}/toggle-client-edit
+    // Бухгалтер toggles client edit access
+    @PreAuthorize("hasRole('MANAGER')")
+    @PutMapping("/{id}/toggle-client-edit")
+    public ResponseEntity<?> toggleClientEdit(@PathVariable int id) {
+        try {
+            Order order = orderRepository.findById(id).orElse(null);
+            if (order == null) return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
+
+            order.setClientEditEnabled(!order.isClientEditEnabled());
+            orderRepository.save(order);
+            return ResponseEntity.ok(order);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(errorResponse("Ошибка при переключении доступа"));
+        }
+    }
+
     private Map<String, String> errorResponse(String message) {
         Map<String, String> response = new HashMap<>();
         response.put("message", message);
@@ -548,4 +610,12 @@ public class OrderController {
         public boolean isPaid() { return paid; }
         public Double getInvoiceAmount() { return price; }
     }
+
+    public static class FieldValueRequest {
+        public String fieldKey, fieldValue, filledByRole;
+        public Integer rowIndex;
+    }
+
+
+
 }
