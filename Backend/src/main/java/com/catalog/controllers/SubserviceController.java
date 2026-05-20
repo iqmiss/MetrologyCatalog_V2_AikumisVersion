@@ -16,10 +16,14 @@ public class SubserviceController {
     private final SubserviceRepository subserviceRepository;
     private final SubserviceFieldRepository subserviceFieldRepository;
 
+private final com.catalog.repository.ServiceRepository serviceRepository;
+
     public SubserviceController(SubserviceRepository subserviceRepository,
-                                SubserviceFieldRepository subserviceFieldRepository) {
+                                SubserviceFieldRepository subserviceFieldRepository,
+                                com.catalog.repository.ServiceRepository serviceRepository) {
         this.subserviceRepository = subserviceRepository;
         this.subserviceFieldRepository = subserviceFieldRepository;
+        this.serviceRepository = serviceRepository;
     }
 
     // GET /api/subservices?serviceId=1
@@ -28,6 +32,14 @@ public class SubserviceController {
     public ResponseEntity<List<Subservice>> getByService(@RequestParam int serviceId) {
         List<Subservice> subservices = subserviceRepository
                 .findByServiceIdAndIsActive(serviceId, true);
+
+        com.catalog.models.Service svc = serviceRepository
+                .findById(serviceId).orElse(null);
+        if (svc != null && svc.getCode() != null) {
+            subservices.forEach(s ->
+                s.setFullCode(svc.getCode() + "_" + s.getCode())
+            );
+        }
         return ResponseEntity.ok(subservices);
     }
 
