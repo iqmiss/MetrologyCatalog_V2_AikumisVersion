@@ -63,6 +63,30 @@ public class Order {
     @Column(name = "receipt_uploaded_at")
     private LocalDateTime receiptUploadedAt;
 
+    @Column(name = "subservice_id")
+private Integer subserviceId;
+
+@Column(name = "secondary_status")
+private String secondaryStatus;
+
+@Column(name = "application_code")
+private String applicationCode;
+
+@Column(name = "service_address")
+private String serviceAddress;
+
+@Column(name = "responsible_department")
+private String responsibleDepartment;
+
+@Column(name = "signer_user_id")
+private Integer signerUserId;
+
+@Column(name = "client_edit_enabled")
+private boolean clientEditEnabled = false;
+
+@Column(name = "form_locked")
+private boolean formLocked = false;
+
     public Order() {}
 
     public int getId() { return id; }
@@ -101,4 +125,28 @@ public class Order {
     public void setPaymentReceiptName(String paymentReceiptName) { this.paymentReceiptName = paymentReceiptName; }
     public LocalDateTime getReceiptUploadedAt() { return receiptUploadedAt; }
     public void setReceiptUploadedAt(LocalDateTime receiptUploadedAt) { this.receiptUploadedAt = receiptUploadedAt; }
-}
+
+    public Integer getSubserviceId() { return subserviceId; }
+    public void setSubserviceId(Integer subserviceId) { this.subserviceId = subserviceId; }
+
+    public String getSecondaryStatus() { return secondaryStatus; }
+    public void setSecondaryStatus(String secondaryStatus) { this.secondaryStatus = secondaryStatus; }
+
+    public String getApplicationCode() { return applicationCode; }
+    public void setApplicationCode(String applicationCode) { this.applicationCode = applicationCode; }
+
+    public String getServiceAddress() { return serviceAddress; }
+    public void setServiceAddress(String serviceAddress) { this.serviceAddress = serviceAddress; }
+
+    public String getResponsibleDepartment() { return responsibleDepartment; }
+    public void setResponsibleDepartment(String responsibleDepartment) { this.responsibleDepartment = responsibleDepartment; }
+
+    public Integer getSignerUserId() { return signerUserId; }
+    public void setSignerUserId(Integer signerUserId) { this.signerUserId = signerUserId; }
+
+    public boolean isClientEditEnabled() { return clientEditEnabled; }
+    public void setClientEditEnabled(boolean clientEditEnabled) { this.clientEditEnabled = clientEditEnabled; }
+
+    public boolean isFormLocked() { return formLocked; }
+    public void setFormLocked(boolean formLocked) { this.formLocked = formLocked; }
+        }

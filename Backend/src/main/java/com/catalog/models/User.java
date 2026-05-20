@@ -39,6 +39,9 @@ public class User {
     @Column(name = "password_reset_expires")
     private java.time.LocalDateTime passwordResetExpires;
 
+    @Column(name = "iin", length = 12)
+    private String iin;
+
     public User() {}
 
     public User(String email, String passwordHash, String role, String fullName) {
@@ -81,4 +84,7 @@ public class User {
     
     public java.time.LocalDateTime getPasswordResetExpires() { return passwordResetExpires; }
     public void setPasswordResetExpires(java.time.LocalDateTime passwordResetExpires) { this.passwordResetExpires = passwordResetExpires; }
+
+    public String getIin() { return iin; }
+    public void setIin(String iin) { this.iin = iin; }
 }
