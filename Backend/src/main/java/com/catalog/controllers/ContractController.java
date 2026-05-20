@@ -1,5 +1,7 @@
 package com.catalog.controllers;
 
+import com.catalog.service.ApplicationCodeService;
+
 import com.catalog.models.Contract;
 import com.catalog.models.Order;
 import com.catalog.repository.ContractRepository;
@@ -25,16 +27,19 @@ public class ContractController {
     private final OrderRepository orderRepository;
     private final PdfService pdfService;
     private final NotificationService notificationService;
+    private final ApplicationCodeService applicationCodeService;
 
     public ContractController(ContractRepository contractRepository,
-                               OrderRepository orderRepository,
-                               PdfService pdfService,
-                               NotificationService notificationService) {
-        this.contractRepository = contractRepository;
-        this.orderRepository = orderRepository;
-        this.pdfService = pdfService;
-        this.notificationService = notificationService;
-    }
+                                   OrderRepository orderRepository,
+                                   PdfService pdfService,
+                                   NotificationService notificationService,
+                                   ApplicationCodeService applicationCodeService) {
+            this.contractRepository = contractRepository;
+            this.orderRepository = orderRepository;
+            this.pdfService = pdfService;
+            this.notificationService = notificationService;
+            this.applicationCodeService = applicationCodeService;
+        }
 
     // GET /api/contracts/{orderId}
     @GetMapping("/{orderId}")
@@ -273,16 +278,16 @@ public class ContractController {
             contract.setGenDirectorSignedAt(LocalDateTime.now());
             contract.setGenDirectorSignedBy(req.userId);
             contract.setStatus("signed");
-
-                    String regNumber = "РЕГ-" + DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDateTime.now())
-                + "-" + orderId;
-            contract.setRegistrationNumber(regNumber);
             contractRepository.save(contract);
 
             Order order = orderRepository.findById(orderId).orElse(null);
             if (order != null) {
+                String appCode = applicationCodeService.generateCode(order);
+                contract.setRegistrationNumber(appCode);
+                order.setApplicationCode(appCode);
                 order.setStatus("awaiting_payment");
                 orderRepository.save(order);
+                contractRepository.save(contract);
                 notificationService.notifyFinanciersContractSigned(orderId, order.getOrderNumber());
             }
 

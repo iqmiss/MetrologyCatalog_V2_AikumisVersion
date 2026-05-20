@@ -31,6 +31,8 @@ public class Service {
     private boolean isActive;
 
     private String standard;
+    @Column(name = "code", length = 10)
+    private String code;
 
     @Transient
     private String labName;
@@ -55,6 +57,8 @@ public class Service {
     public void setActive(boolean active) { isActive = active; }
     public String getStandard() { return standard; }
     public void setStandard(String standard) { this.standard = standard; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
     public String getLabName() { return labName; }
     public void setLabName(String labName) { this.labName = labName; }
 }
