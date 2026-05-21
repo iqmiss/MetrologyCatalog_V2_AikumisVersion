@@ -19,7 +19,7 @@ public class SubserviceField {
     @Column(name = "label_ru", nullable = false)
     private String labelRu;
 
-    @Column(name = "field_type", nullable = false, columnDefinition = "ENUM('text','number','date','select','file')")
+    @Column(name = "field_type", nullable = false, columnDefinition = "ENUM('text','number','date','select','file','checkbox')")
     private String fieldType;
 
     @Column(nullable = false)

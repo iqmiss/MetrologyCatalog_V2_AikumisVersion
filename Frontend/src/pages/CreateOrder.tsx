@@ -110,6 +110,22 @@ export default function CreateOrder() {
       );
     }
 
+
+    if (field.fieldType === 'checkbox') {
+      return (
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={value === 'true'}
+            onChange={e => setFieldValue(field.fieldKey, rowIndex, e.target.checked ? 'true' : '')}
+            className="mt-1 w-4 h-4 accent-[#00B2FF] shrink-0 cursor-pointer"
+            required={field.required}
+          />
+          <span className="text-sm text-gray-700 leading-relaxed">{field.labelRu}</span>
+        </label>
+      );
+    }
+
     if (field.fieldType === 'file') {
       return (
         <input type="file" onChange={e => {
@@ -354,15 +370,17 @@ export default function CreateOrder() {
 
               {staticFields.length > 0 && (
                 <div className="flex flex-col gap-4">
-                  {staticFields.map(field => (
-                    <div key={field.fieldKey}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        {field.labelRu} {field.required && '*'}
-                        {!field.required && <span className="text-gray-400 font-normal"> (при наличии)</span>}
-                      </label>
-                      {renderField(field, 0)}
-                    </div>
-                  ))}
+                    {staticFields.map(field => (
+                      <div key={field.fieldKey}>
+                        {field.fieldType !== 'checkbox' && (
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            {field.labelRu} {field.required && '*'}
+                            {!field.required && <span className="text-gray-400 font-normal"> (при наличии)</span>}
+                          </label>
+                        )}
+                        {renderField(field, 0)}
+                      </div>
+                    ))}
                 </div>
               )}
             </div>

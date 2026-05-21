@@ -57,8 +57,7 @@ export interface SubserviceField {
   subserviceId: number;
   fieldKey: string;
   labelRu: string;
-  fieldType: 'text' | 'number' | 'date' | 'select' | 'file';
-  required: boolean;
+  fieldType: 'text' | 'number' | 'date' | 'select' | 'file' | 'checkbox';  required: boolean;
   optionsJson?: string;
   sortOrder: number;
   isRepeating: boolean;
