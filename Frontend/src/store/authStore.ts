@@ -30,9 +30,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setError: (error) => set({ error }),
 
   login: (user, token) => {
+    const normalizedUser = { ...user, role: user.role.toLowerCase() as User['role'] };
     localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    set({ user, token, isAuthenticated: true, error: null });
+    localStorage.setItem('user', JSON.stringify(normalizedUser));
+    set({ user: normalizedUser, token, isAuthenticated: true, error: null });
   },
 
   logout: () => {
@@ -48,7 +49,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
-        set({ user, token, isAuthenticated: true });
+        const normalizedUser = { ...user, role: user.role.toLowerCase() as User['role'] };
+        set({ user: normalizedUser, token, isAuthenticated: true });
       } catch (e) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
