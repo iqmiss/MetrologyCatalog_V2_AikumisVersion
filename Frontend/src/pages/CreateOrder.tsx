@@ -1,46 +1,47 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import api, { serviceApi, orderApi, userApi } from '../services/api';
-import type { Service, Laboratory, User } from '../types';
+import { serviceApi, orderApi, userApi, subserviceApi } from '../services/api';
+import type { Service, User, Subservice, SubserviceField } from '../types';
 
 export default function CreateOrder() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthStore();
+
+  const preselectedServiceId = location.state?.serviceId;
+  const preselectedSubserviceId = location.state?.subserviceId;
+
   const [services, setServices] = useState<Service[]>([]);
-  const [laboratories, setLaboratories] = useState<Laboratory[]>([]);
   const [clients, setClients] = useState<User[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const [formData, setFormData] = useState({
-    serviceId: location.state?.serviceId?.toString() || '',
-    labId: '',
-    deviceType: '',
-    model: '',
-    serialNumber: '',
-    quantity: '1',
-    dueDate: '',
-    clientComment: '',
-  });
+  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(preselectedServiceId || null);
+  const [selectedSubserviceId, setSelectedSubserviceId] = useState<number | null>(preselectedSubserviceId || null);
+  const [subservice, setSubservice] = useState<Subservice | null>(null);
+  const [fields, setFields] = useState<SubserviceField[]>([]);
+
+  const [fieldValues, setFieldValues] = useState<Record<string, Record<number, string>>>({});
+  const [tableRows, setTableRows] = useState<number[]>([0]);
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    if (selectedSubserviceId) loadSubserviceFields(selectedSubserviceId);
+    else { setFields([]); setSubservice(null); }
+  }, [selectedSubserviceId]);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const requests: Promise<any>[] = [
-        serviceApi.getAll(),
-        api.get('/laboratories'),
-      ];
+      const requests: Promise<any>[] = [serviceApi.getAll()];
       if (user?.role === 'manager') requests.push(userApi.getClients());
       const results = await Promise.all(requests);
       setServices(results[0].data);
-      setLaboratories(results[1].data);
-      if (user?.role === 'manager' && results[2]) setClients(results[2].data);
+      if (user?.role === 'manager' && results[1]) setClients(results[1].data);
     } catch {
       setError('Ошибка при загрузке данных');
     } finally {
@@ -48,9 +49,85 @@ export default function CreateOrder() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+  const loadSubserviceFields = async (subserviceId: number) => {
+    try {
+      const [subRes, fieldsRes] = await Promise.all([
+        subserviceApi.getById(subserviceId),
+        subserviceApi.getFields(subserviceId),
+      ]);
+      setSubservice(subRes.data);
+      setFields(fieldsRes.data);
+      setFieldValues({});
+      setTableRows([0]);
+    } catch {
+      setError('Ошибка при загрузке полей формы');
+    }
+  };
+
+  const getFieldValue = (fieldKey: string, rowIndex: number) =>
+    fieldValues[fieldKey]?.[rowIndex] || '';
+
+  const setFieldValue = (fieldKey: string, rowIndex: number, value: string) => {
+    setFieldValues(prev => ({
+      ...prev,
+      [fieldKey]: { ...(prev[fieldKey] || {}), [rowIndex]: value }
+    }));
+  };
+
+  const addTableRow = () => {
+    setTableRows(prev => [...prev, prev[prev.length - 1] + 1]);
+  };
+
+  const removeTableRow = (rowIndex: number) => {
+    if (tableRows.length <= 1) return;
+    setTableRows(prev => prev.filter(r => r !== rowIndex));
+    setFieldValues(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(key => {
+        const { [rowIndex]: _, ...rest } = updated[key];
+        updated[key] = rest;
+      });
+      return updated;
+    });
+  };
+
+  const repeatingFields = fields.filter(f => f.isRepeating);
+  const staticFields = fields.filter(f => !f.isRepeating);
+
+  const renderField = (field: SubserviceField, rowIndex: number = 0) => {
+    const value = getFieldValue(field.fieldKey, rowIndex);
+    const inputClass = "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white";
+
+    if (field.fieldType === 'select') {
+      const options = field.optionsJson ? JSON.parse(field.optionsJson) : [];
+      return (
+        <select value={value} onChange={e => setFieldValue(field.fieldKey, rowIndex, e.target.value)}
+          className={inputClass + ' cursor-pointer'} style={{ fontFamily: 'inherit', marginBottom: 0 }}
+          required={field.required}>
+          <option value="">— Выберите —</option>
+          {options.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    }
+
+    if (field.fieldType === 'file') {
+      return (
+        <input type="file" onChange={e => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => setFieldValue(field.fieldKey, rowIndex, reader.result as string);
+          reader.readAsDataURL(file);
+        }} className={inputClass} style={{ fontFamily: 'inherit', marginBottom: 0 }} />
+      );
+    }
+
+    return (
+      <input type={field.fieldType === 'number' ? 'number' : field.fieldType === 'date' ? 'date' : 'text'}
+        value={value} onChange={e => setFieldValue(field.fieldKey, rowIndex, e.target.value)}
+        required={field.required} className={inputClass}
+        style={{ fontFamily: 'inherit', marginBottom: 0 }} />
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,43 +135,80 @@ export default function CreateOrder() {
     setError('');
     setSuccess('');
 
-    if (user?.role === 'manager' && !selectedClientId) {
-      setError('Выберите клиента');
-      return;
-    }
+    if (user?.role === 'manager' && !selectedClientId) { setError('Выберите клиента'); return; }
+    if (!selectedServiceId) { setError('Выберите услугу'); return; }
 
-    if (!formData.serviceId || !formData.labId || !formData.deviceType || !formData.serialNumber || !formData.dueDate) {
-      setError('Заполните все обязательные поля');
-      return;
+    for (const field of fields) {
+      if (!field.required) continue;
+      if (field.isRepeating) {
+        for (const rowIndex of tableRows) {
+          if (!getFieldValue(field.fieldKey, rowIndex)) {
+            setError(`Заполните обязательное поле: ${field.labelRu}`);
+            return;
+          }
+        }
+      } else {
+        if (!getFieldValue(field.fieldKey, 0)) {
+          setError(`Заполните обязательное поле: ${field.labelRu}`);
+          return;
+        }
+      }
     }
 
     try {
-      const orderPayload = {
+      const orderPayload: any = {
         clientId: user?.role === 'manager' ? selectedClientId : user?.id,
-        serviceId: parseInt(formData.serviceId),
-        labId: parseInt(formData.labId),
-        dueDate: formData.dueDate,
-        clientComment: formData.clientComment || null,
-        orderItems: [{
-          deviceType: formData.deviceType,
-          model: formData.model,
-          serialNumber: formData.serialNumber,
-          quantity: parseInt(formData.quantity),
-        }],
+        serviceId: selectedServiceId,
+        labId: 1,
+        dueDate: null,
+        subserviceId: selectedSubserviceId || null,
+        orderItems: repeatingFields.length === 0
+          ? [{ deviceType: 'Не указан', model: '', serialNumber: 'Н/А', quantity: 1 }]
+          : tableRows.map(rowIndex => ({
+              deviceType: getFieldValue('si_name', rowIndex) || 'Не указан',
+              model: getFieldValue('producer', rowIndex) || '',
+              serialNumber: getFieldValue('serial_number', rowIndex) || String(rowIndex + 1),
+              quantity: parseInt(getFieldValue('quantity', rowIndex) || '1'),
+            })),
       };
 
-      await orderApi.create(orderPayload);
-      setSuccess('Заявка создана успешно!');
+      const orderRes = await orderApi.create(orderPayload);
+      const orderId = orderRes.data.id;
+
+      if (fields.length > 0) {
+        const fieldPayload: any[] = [];
+        for (const field of fields) {
+          if (field.isRepeating) {
+            tableRows.forEach(rowIndex => {
+              fieldPayload.push({
+                fieldKey: field.fieldKey,
+                fieldValue: getFieldValue(field.fieldKey, rowIndex),
+                rowIndex,
+                filledByRole: 'client',
+              });
+            });
+          } else {
+            fieldPayload.push({
+              fieldKey: field.fieldKey,
+              fieldValue: getFieldValue(field.fieldKey, 0),
+              rowIndex: 0,
+              filledByRole: 'client',
+            });
+          }
+        }
+        await orderApi.saveFields(orderId, fieldPayload);
+      }
+
+      setSuccess('Заявка успешно оформлена!');
       setTimeout(() => navigate('/orders'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при создании заявки');
     }
   };
 
-  const selectedService = services.find(s => s.id === parseInt(formData.serviceId));
-
+  const selectedService = services.find(s => s.id === selectedServiceId);
   const inputClass = "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white";
-  const selectClass = "w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white cursor-pointer";
+  const selectClass = inputClass + ' cursor-pointer';
 
   if (isLoading) {
     return (
@@ -122,6 +236,14 @@ export default function CreateOrder() {
           </p>
         </div>
 
+        {/* Warning banner */}
+        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6 text-amber-700 text-sm">
+          <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path d="M12 9v4m0 4h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          </svg>
+          <span>Данная заявка оформляется только на ваше имя. Если услуга требуется другому лицу, оно должно зарегистрироваться самостоятельно.</span>
+        </div>
+
         {error && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-red-600 text-sm">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -143,130 +265,113 @@ export default function CreateOrder() {
 
           {user?.role === 'manager' && (
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-              <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
-                Клиент
-              </p>
+              <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>Клиент</p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Выберите клиента *</label>
                 <select value={selectedClientId || ''} onChange={e => setSelectedClientId(parseInt(e.target.value))}
                   className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
                   <option value="">— Выберите клиента —</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.fullName} ({c.email})</option>
-                  ))}
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.fullName} ({c.email})</option>)}
                 </select>
               </div>
             </div>
           )}
 
+          {/* Service selection */}
           <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-            <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
-              Выберите услугу
-            </p>
+            <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>Выберите услугу</p>
             <div className="flex flex-col gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Услуга *</label>
-                <select name="serviceId" value={formData.serviceId} onChange={handleChange} required
-                  className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
+                <select value={selectedServiceId || ''} onChange={e => { setSelectedServiceId(Number(e.target.value)); setSelectedSubserviceId(null); }}
+                  required className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
                   <option value="">— Выберите услугу —</option>
-                  {services.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.measurementType})
-                    </option>
-                  ))}
+                  {services.map(s => <option key={s.id} value={s.id}>{s.name}{s.code ? ` (${s.code})` : ''}</option>)}
                 </select>
               </div>
-              {selectedService && (
+              {selectedService?.description && (
                 <div className="bg-[#00B2FF]/5 border-l-4 border-[#00B2FF] rounded-lg p-4">
                   <p className="text-sm text-gray-600 mb-1" style={{ margin: '0 0 4px' }}>
-                    <span className="font-semibold text-[#0A2E5C]">Описание: </span>
-                    {selectedService.description}
+                    <span className="font-semibold text-[#0A2E5C]">Описание: </span>{selectedService.description}
                   </p>
                   <p className="text-sm text-gray-600" style={{ margin: 0 }}>
-                    <span className="font-semibold text-[#0A2E5C]">Срок выполнения: </span>
-                    {selectedService.durationDays} рабочих дней
+                    <span className="font-semibold text-[#0A2E5C]">Срок: </span>{selectedService.durationDays} рабочих дней
                   </p>
+                </div>
+              )}
+
+              {subservice && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <p className="text-sm font-semibold text-blue-800 mb-1" style={{ margin: '0 0 4px' }}>
+                    Подуслуга: {subservice.fullCode} — {subservice.name}
+                  </p>
+                  {subservice.description && (
+                    <p className="text-xs text-blue-600" style={{ margin: 0 }}>{subservice.description}</p>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-            <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
-              Информация о приборе
-            </p>
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Тип прибора *</label>
-                <input type="text" name="deviceType" value={formData.deviceType} onChange={handleChange}
-                  placeholder="Манометр, Амперметр и т.д." required className={inputClass}
-                  style={{ fontFamily: 'inherit', marginBottom: 0 }} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Модель</label>
-                <input type="text" name="model" value={formData.model} onChange={handleChange}
-                  placeholder="Модель прибора" className={inputClass}
-                  style={{ fontFamily: 'inherit', marginBottom: 0 }} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Серийный номер *</label>
-                <input type="text" name="serialNumber" value={formData.serialNumber} onChange={handleChange}
-                  placeholder="Введите серийный номер" required className={inputClass}
-                  style={{ fontFamily: 'inherit', marginBottom: 0 }} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Количество *</label>
-                <input type="number" name="quantity" value={formData.quantity} onChange={handleChange}
-                  min="1" required className={inputClass}
-                  style={{ fontFamily: 'inherit', marginBottom: 0 }} />
-              </div>
-            </div>
-          </div>
+          {/* Dynamic fields */}
+          {fields.length > 0 && (
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+              <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
+                Данные заявки
+              </p>
 
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-            <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
-              Место и дата
-            </p>
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Лаборатория *</label>
-                <select name="labId" value={formData.labId} onChange={handleChange} required
-                  className={selectClass} style={{ fontFamily: 'inherit', marginBottom: 0 }}>
-                  <option value="">— Выберите лабораторию —</option>
-                  {laboratories.map(lab => (
-                    <option key={lab.id} value={lab.id}>{lab.name} ({lab.city})</option>
+              {repeatingFields.length > 0 && (
+                <div className="flex flex-col gap-4 mb-6">
+                  {tableRows.map((rowIndex, i) => (
+                    <div key={rowIndex} className="border border-gray-200 rounded-xl p-4 relative">
+                      <p className="text-xs font-semibold text-gray-500 mb-3" style={{ margin: '0 0 12px' }}>
+                        Прибор #{i + 1}
+                      </p>
+                      {tableRows.length > 1 && (
+                        <button type="button" onClick={() => removeTableRow(rowIndex)}
+                          className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-xs border-none bg-transparent cursor-pointer">
+                          Удалить
+                        </button>
+                      )}
+                      <div className="flex flex-col gap-3">
+                        {repeatingFields.map(field => (
+                          <div key={field.fieldKey}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                              {field.labelRu} {field.required && '*'}
+                            </label>
+                            {renderField(field, rowIndex)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Плановая дата сдачи *</label>
-                <input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange}
-                  required min={new Date().toISOString().split('T')[0]} max="2099-12-31"
-                  className={inputClass} style={{ fontFamily: 'inherit', marginBottom: 0 }} />
-              </div>
-            </div>
-          </div>
+                  <button type="button" onClick={addTableRow}
+                    className="w-full py-2.5 border-2 border-dashed border-[#00B2FF]/40 text-[#00B2FF] rounded-xl text-sm font-medium hover:border-[#00B2FF] hover:bg-[#00B2FF]/5 transition-all cursor-pointer bg-transparent">
+                    + Добавить прибор
+                  </button>
+                </div>
+              )}
 
-          <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-            <p className="text-xs font-semibold text-[#00B2FF] uppercase tracking-wider mb-4" style={{ margin: '0 0 16px' }}>
-              Комментарий
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Дополнительные пожелания (необязательно)
-              </label>
-              <textarea name="clientComment" value={formData.clientComment} onChange={handleChange}
-                placeholder="Опишите особенности приборов, срочность, дополнительные требования..."
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-gray-900 text-sm outline-none focus:border-[#00B2FF] focus:ring-2 focus:ring-[#00B2FF]/10 transition-all bg-white resize-none"
-                style={{ fontFamily: 'inherit', marginBottom: 0 }} />
+              {staticFields.length > 0 && (
+                <div className="flex flex-col gap-4">
+                  {staticFields.map(field => (
+                    <div key={field.fieldKey}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        {field.labelRu} {field.required && '*'}
+                        {!field.required && <span className="text-gray-400 font-normal"> (при наличии)</span>}
+                      </label>
+                      {renderField(field, 0)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           <button type="submit"
             className="w-full py-4 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-semibold rounded-xl border-none cursor-pointer text-base transition-colors"
             style={{ marginBottom: 0 }}>
-            Создать заявку
+            Оформить заявление
           </button>
         </form>
       </div>

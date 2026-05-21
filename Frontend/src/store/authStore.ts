@@ -51,6 +51,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         const user = JSON.parse(userStr);
         const normalizedUser = { ...user, role: user.role.toLowerCase() as User['role'] };
         set({ user: normalizedUser, token, isAuthenticated: true });
+
       } catch (e) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');

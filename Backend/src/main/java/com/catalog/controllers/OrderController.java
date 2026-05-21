@@ -36,22 +36,22 @@ public class OrderController {
     private final com.catalog.repository.ApplicationFieldValueRepository applicationFieldValueRepository;
 
     public OrderController(OrderRepository orderRepository,
-                               OrderItemRepository orderItemRepository,
-                               UserRepository userRepository,
-                               EmailService emailService,
-                               ContractRepository contractRepository,
-                               LaboratoryRepository laboratoryRepository,
-                               NotificationService notificationService,
-                               com.catalog.repository.ApplicationFieldValueRepository applicationFieldValueRepository) {
-            this.orderRepository = orderRepository;
-            this.orderItemRepository = orderItemRepository;
-            this.userRepository = userRepository;
-            this.emailService = emailService;
-            this.contractRepository = contractRepository;
-            this.laboratoryRepository = laboratoryRepository;
-            this.notificationService = notificationService;
-            this.applicationFieldValueRepository = applicationFieldValueRepository;
-        }
+                           OrderItemRepository orderItemRepository,
+                           UserRepository userRepository,
+                           EmailService emailService,
+                           ContractRepository contractRepository,
+                           LaboratoryRepository laboratoryRepository,
+                           NotificationService notificationService,
+                           com.catalog.repository.ApplicationFieldValueRepository applicationFieldValueRepository) {
+        this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
+        this.contractRepository = contractRepository;
+        this.laboratoryRepository = laboratoryRepository;
+        this.notificationService = notificationService;
+        this.applicationFieldValueRepository = applicationFieldValueRepository;
+    }
 
     @GetMapping
     public ResponseEntity<?> getAllOrders(@RequestParam(required = false) Integer labId) {
@@ -112,7 +112,6 @@ public class OrderController {
         }
     }
 
-    // POST /api/orders — создать заявку (totalPrice убран)
     @PostMapping
     public ResponseEntity<?> createOrder(@RequestBody CreateOrderRequest request) {
         try {
@@ -120,51 +119,41 @@ public class OrderController {
                 return ResponseEntity.status(400).body(errorResponse("ID клиента обязателен"));
             if (request.getServiceId() == null)
                 return ResponseEntity.status(400).body(errorResponse("ID услуги обязателен"));
-            if (request.getLabId() == null)
-                return ResponseEntity.status(400).body(errorResponse("ID лаборатории обязателен"));
-            if (request.getDueDate() == null || request.getDueDate().isEmpty())
-                return ResponseEntity.status(400).body(errorResponse("Дата сдачи обязательна"));
-            if (request.getOrderItems() == null || request.getOrderItems().isEmpty())
-                return ResponseEntity.status(400).body(errorResponse("Добавьте хотя бы один прибор"));
-
-            for (OrderItemRequest item : request.getOrderItems()) {
-                if (item.getDeviceType() == null || item.getDeviceType().isEmpty())
-                    return ResponseEntity.status(400).body(errorResponse("Тип прибора обязателен"));
-                if (item.getSerialNumber() == null || item.getSerialNumber().isEmpty())
-                    return ResponseEntity.status(400).body(errorResponse("Серийный номер обязателен"));
-                if (item.getQuantity() == null || item.getQuantity() <= 0)
-                    return ResponseEntity.status(400).body(errorResponse("Количество должно быть больше 0"));
-            }
 
             Order order = new Order();
             order.setOrderNumber("ORD-" + System.currentTimeMillis());
             order.setClientId(request.getClientId());
             order.setServiceId(request.getServiceId());
-            order.setLabId(request.getLabId());
+            order.setLabId(request.getLabId() != null ? request.getLabId() : 1);
             order.setStatus("pending_contract");
-            // totalPrice убран — цена объявляется финансистом позже
-            try {
-                LocalDate parsedDate = LocalDate.parse(request.getDueDate());
-                if (parsedDate.getYear() > 2099 || parsedDate.getYear() < 2000)
-                    return ResponseEntity.status(400).body(errorResponse("Некорректная дата"));
-                order.setDueDate(parsedDate);
-            } catch (Exception e) {
-                return ResponseEntity.status(400).body(errorResponse("Неверный формат даты. Используйте YYYY-MM-DD"));
+
+            if (request.getDueDate() != null && !request.getDueDate().isEmpty()) {
+                try {
+                    LocalDate parsedDate = LocalDate.parse(request.getDueDate());
+                    if (parsedDate.getYear() > 2099 || parsedDate.getYear() < 2000)
+                        return ResponseEntity.status(400).body(errorResponse("Некорректная дата"));
+                    order.setDueDate(parsedDate);
+                } catch (Exception e) {
+                    return ResponseEntity.status(400).body(errorResponse("Неверный формат даты. Используйте YYYY-MM-DD"));
+                }
             }
+
             if (request.getClientComment() != null) order.setClientComment(request.getClientComment());
+            if (request.getSubserviceId() != null) order.setSubserviceId(request.getSubserviceId());
             orderRepository.save(order);
 
-            for (OrderItemRequest itemReq : request.getOrderItems()) {
-                OrderItem item = new OrderItem();
-                item.setOrderId(order.getId());
-                item.setDeviceType(itemReq.getDeviceType());
-                item.setModel(itemReq.getModel());
-                item.setSerialNumber(itemReq.getSerialNumber());
-                item.setQuantity(itemReq.getQuantity());
-                orderItemRepository.save(item);
+            if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
+                for (OrderItemRequest itemReq : request.getOrderItems()) {
+                    OrderItem item = new OrderItem();
+                    item.setOrderId(order.getId());
+                    item.setDeviceType(itemReq.getDeviceType() != null ? itemReq.getDeviceType() : "Не указан");
+                    item.setModel(itemReq.getModel());
+                    item.setSerialNumber(itemReq.getSerialNumber() != null ? itemReq.getSerialNumber() : "Н/А");
+                    item.setQuantity(itemReq.getQuantity() != null ? itemReq.getQuantity() : 1);
+                    orderItemRepository.save(item);
+                }
             }
 
-            // Создаём черновик договора
             Contract contract = new Contract(order.getId(), "CNT-" + System.currentTimeMillis());
             contractRepository.save(contract);
 
@@ -177,7 +166,6 @@ public class OrderController {
         }
     }
 
-    // PUT /api/orders/{id} — редактирование менеджером (totalPrice убран)
     @PutMapping("/{id}")
     public ResponseEntity<?> updateOrder(@PathVariable int id, @RequestBody UpdateOrderRequest request) {
         try {
@@ -186,12 +174,12 @@ public class OrderController {
 
             if (request.getServiceId() != null) order.setServiceId(request.getServiceId());
             if (request.getLabId() != null) order.setLabId(request.getLabId());
+            if (request.getSubserviceId() != null) order.setSubserviceId(request.getSubserviceId());
             if (request.getDueDate() != null && !request.getDueDate().isEmpty()) {
                 try { order.setDueDate(LocalDate.parse(request.getDueDate())); }
                 catch (Exception e) { return ResponseEntity.status(400).body(errorResponse("Неверный формат даты")); }
             }
             if (request.getClientComment() != null) order.setClientComment(request.getClientComment());
-
             orderRepository.save(order);
             return ResponseEntity.ok(order);
         } catch (Exception e) {
@@ -266,8 +254,6 @@ public class OrderController {
             if (order == null) return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
             if (!"revision".equals(order.getStatus()))
                 return ResponseEntity.status(400).body(errorResponse("Повторно отправить можно только заявку в статусе 'revision'"));
-            if (request.getOrderItems() == null || request.getOrderItems().isEmpty())
-                return ResponseEntity.status(400).body(errorResponse("Добавьте хотя бы один прибор"));
 
             if (request.getServiceId() != null) order.setServiceId(request.getServiceId());
             if (request.getLabId() != null) order.setLabId(request.getLabId());
@@ -280,15 +266,17 @@ public class OrderController {
             order.setStatus("pending_contract");
             orderRepository.save(order);
 
-            orderItemRepository.deleteAll(orderItemRepository.findByOrderId(id));
-            for (OrderItemRequest itemReq : request.getOrderItems()) {
-                OrderItem item = new OrderItem();
-                item.setOrderId(order.getId());
-                item.setDeviceType(itemReq.getDeviceType());
-                item.setModel(itemReq.getModel());
-                item.setSerialNumber(itemReq.getSerialNumber());
-                item.setQuantity(itemReq.getQuantity());
-                orderItemRepository.save(item);
+            if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
+                orderItemRepository.deleteAll(orderItemRepository.findByOrderId(id));
+                for (OrderItemRequest itemReq : request.getOrderItems()) {
+                    OrderItem item = new OrderItem();
+                    item.setOrderId(order.getId());
+                    item.setDeviceType(itemReq.getDeviceType());
+                    item.setModel(itemReq.getModel());
+                    item.setSerialNumber(itemReq.getSerialNumber());
+                    item.setQuantity(itemReq.getQuantity());
+                    orderItemRepository.save(item);
+                }
             }
 
             notificationService.notifyManagersResubmit(order.getOrderNumber());
@@ -375,31 +363,25 @@ public class OrderController {
         }
     }
 
-
-    // PUT /api/orders/{id}/set-price
-    // Финансист объявляет цену — записывается в order.price, статус не меняется
     @PutMapping("/{id}/set-price")
     public ResponseEntity<?> setPrice(@PathVariable int id, @RequestBody SetPriceRequest request) {
         try {
             Order order = orderRepository.findById(id).orElse(null);
             if (order == null) return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
             if (!"awaiting_payment".equals(order.getStatus()))
-                return ResponseEntity.status(400).body(errorResponse("Цену можно объявить только для заявки в статусе \'awaiting_payment\'"));
+                return ResponseEntity.status(400).body(errorResponse("Цену можно объявить только для заявки в статусе 'awaiting_payment'"));
             if (request.getPrice() == null || request.getPrice() <= 0)
                 return ResponseEntity.status(400).body(errorResponse("Цена должна быть больше 0"));
 
             order.setPrice(request.getPrice());
             orderRepository.save(order);
-
             notificationService.notifyManagerInvoiceReady(order.getId(), order.getOrderNumber());
-
             return ResponseEntity.ok(order);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при объявлении цены"));
         }
     }
 
-    // PUT /api/orders/{id}/payment — финансист подтверждает оплату и устанавливает цену
     @PutMapping("/{id}/payment")
     public ResponseEntity<?> confirmPayment(@PathVariable int id, @RequestBody PaymentRequest request) {
         try {
@@ -418,9 +400,6 @@ public class OrderController {
         }
     }
 
-
-    // PUT /api/orders/{id}/notify-director
-    // Менеджер уведомляет руководителя что договор подписан и деньги поступили
     @PreAuthorize("hasRole('MANAGER')")
     @PutMapping("/{id}/notify-director")
     public ResponseEntity<?> notifyDirector(@PathVariable int id) {
@@ -439,7 +418,6 @@ public class OrderController {
         }
     }
 
-    // PUT /api/orders/{id}/assign-lab — директор/ген.директор направляет в лабораторию
     @PreAuthorize("hasAnyRole('DIRECTOR', 'GEN_DIRECTOR')")
     @PutMapping("/{id}/assign-lab")
     public ResponseEntity<?> assignToLab(@PathVariable int id, @RequestBody AssignLabRequest request) {
@@ -467,21 +445,15 @@ public class OrderController {
         }
     }
 
-// GET /api/orders/{id}/fields
-    // Returns all field values for an order
     @GetMapping("/{id}/fields")
     public ResponseEntity<?> getFieldValues(@PathVariable int id) {
         try {
-            return ResponseEntity.ok(
-                applicationFieldValueRepository.findByOrderId(id)
-            );
+            return ResponseEntity.ok(applicationFieldValueRepository.findByOrderId(id));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при получении полей"));
         }
     }
 
-    // POST /api/orders/{id}/fields
-    // Client saves field values
     @PostMapping("/{id}/fields")
     public ResponseEntity<?> saveFieldValues(
             @PathVariable int id,
@@ -509,15 +481,12 @@ public class OrderController {
         }
     }
 
-    // PUT /api/orders/{id}/toggle-client-edit
-    // Бухгалтер toggles client edit access
     @PreAuthorize("hasRole('MANAGER')")
     @PutMapping("/{id}/toggle-client-edit")
     public ResponseEntity<?> toggleClientEdit(@PathVariable int id) {
         try {
             Order order = orderRepository.findById(id).orElse(null);
             if (order == null) return ResponseEntity.status(404).body(errorResponse("Заказ не найден"));
-
             order.setClientEditEnabled(!order.isClientEditEnabled());
             orderRepository.save(order);
             return ResponseEntity.ok(order);
@@ -532,24 +501,25 @@ public class OrderController {
         return response;
     }
 
-
     public static class CreateOrderRequest {
-        public Integer clientId, serviceId, labId;
+        public Integer clientId, serviceId, labId, subserviceId;
         public String dueDate, clientComment;
         public List<OrderItemRequest> orderItems;
         public Integer getClientId() { return clientId; }
         public Integer getServiceId() { return serviceId; }
         public Integer getLabId() { return labId; }
+        public Integer getSubserviceId() { return subserviceId; }
         public String getDueDate() { return dueDate; }
         public String getClientComment() { return clientComment; }
         public List<OrderItemRequest> getOrderItems() { return orderItems; }
     }
 
     public static class UpdateOrderRequest {
-        public Integer serviceId, labId;
+        public Integer serviceId, labId, subserviceId;
         public String dueDate, clientComment;
         public Integer getServiceId() { return serviceId; }
         public Integer getLabId() { return labId; }
+        public Integer getSubserviceId() { return subserviceId; }
         public String getDueDate() { return dueDate; }
         public String getClientComment() { return clientComment; }
     }
@@ -568,7 +538,6 @@ public class OrderController {
     public static class OrderItemRequest {
         public String deviceType, model, serialNumber;
         public Integer quantity;
-        // unitPrice убран — цена устанавливается финансистом
         public String getDeviceType() { return deviceType; }
         public String getModel() { return model; }
         public String getSerialNumber() { return serialNumber; }
@@ -596,7 +565,6 @@ public class OrderController {
         public String getFileName() { return fileName; }
     }
 
-
     public static class SetPriceRequest {
         public Double price;
         public Double getPrice() { return price; }
@@ -615,7 +583,4 @@ public class OrderController {
         public String fieldKey, fieldValue, filledByRole;
         public Integer rowIndex;
     }
-
-
-
 }
