@@ -29,6 +29,12 @@ export default function CreateOrder() {
 
   useEffect(() => { fetchData(); }, []);
 
+    useEffect(() => {
+      if (user?.role === 'client' && !location.state?.subserviceId) {
+        navigate('/catalog');
+      }
+    }, []);
+
   useEffect(() => {
     if (selectedSubserviceId) loadSubserviceFields(selectedSubserviceId);
     else { setFields([]); setSubservice(null); }
@@ -216,7 +222,7 @@ export default function CreateOrder() {
       }
 
       setSuccess('Заявка успешно оформлена!');
-      setTimeout(() => navigate('/orders'), 1500);
+      setTimeout(() => navigate(user?.role === 'client' ? '/my-orders' : '/orders'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при создании заявки');
     }

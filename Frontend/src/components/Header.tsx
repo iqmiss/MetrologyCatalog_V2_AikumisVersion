@@ -174,7 +174,7 @@ export default function Header() {
                         );
                         } else if (notif.orderId) {
                           setNotifOpen(false);
-                          navigateTo('/orders');
+                          navigateTo(user?.role === 'client' ? '/my-orders' : '/orders');
                         }
                       }}
                       className={`w-full text-left px-4 py-3 border-b border-gray-50 transition-colors cursor-pointer border-none flex items-start gap-3 ${
@@ -263,11 +263,11 @@ export default function Header() {
                 </svg>
                 Новая заявка
               </button>
-              <button onClick={() => navigateTo('/orders')} className={navItemClass('/orders')} style={navItemStyle('/orders')}>
+                <button onClick={() => navigateTo('/my-orders')} className={navItemClass('/my-orders')} style={navItemStyle('/my-orders')}>
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                   <path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/>
                 </svg>
-                Мои заявки
+                Мои заявления
               </button>
             </div>
           )}
@@ -294,12 +294,6 @@ export default function Header() {
                   <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
                 </svg>
                 Все заявки
-              </button>
-              <button onClick={() => navigateTo('/create-order')} className={navItemClass('/create-order')} style={navItemStyle('/create-order')}>
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
-                </svg>
-                Создать заявку
               </button>
               <button onClick={() => navigateTo('/dashboard')} className={navItemClass('/dashboard')} style={navItemStyle('/dashboard')}>
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
