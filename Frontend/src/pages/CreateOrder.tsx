@@ -18,6 +18,7 @@ export default function CreateOrder() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(preselectedServiceId || null);
   const [selectedSubserviceId, setSelectedSubserviceId] = useState<number | null>(preselectedSubserviceId || null);
@@ -27,13 +28,16 @@ export default function CreateOrder() {
   const [fieldValues, setFieldValues] = useState<Record<string, Record<number, string>>>({});
   const [tableRows, setTableRows] = useState<number[]>([0]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    if (user?.role === 'client' && !location.state?.subserviceId) {
+      navigate('/catalog');
+    }
+    if (user?.role === 'client') {
+      checkProfileComplete();
+    }
+  }, []);
 
-    useEffect(() => {
-      if (user?.role === 'client' && !location.state?.subserviceId) {
-        navigate('/catalog');
-      }
-    }, []);
+  useEffect(() => { fetchData(); }, []);
 
   useEffect(() => {
     if (selectedSubserviceId) loadSubserviceFields(selectedSubserviceId);
@@ -52,6 +56,25 @@ export default function CreateOrder() {
       setError('Ошибка при загрузке данных');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const checkProfileComplete = async () => {
+    try {
+      const res = await userApi.getProfile(user?.id);
+      const data = res.data;
+      const u = data.user || data;
+      const c = data.company;
+
+      const userComplete = u.iin && u.phone;
+      const companyComplete = c && c.directorName && c.directorPosition &&
+        c.iik && c.bankName && c.bik && c.kbe && c.legalAddress && c.address && c.phone;
+
+      if (!userComplete || !companyComplete) {
+        setProfileIncomplete(true);
+      }
+    } catch {
+      // if can't check, allow anyway
     }
   };
 
@@ -115,7 +138,6 @@ export default function CreateOrder() {
         </select>
       );
     }
-
 
     if (field.fieldType === 'checkbox') {
       return (
@@ -266,6 +288,30 @@ export default function CreateOrder() {
           <span>Данная заявка оформляется только на ваше имя. Если услуга требуется другому лицу, оно должно зарегистрироваться самостоятельно.</span>
         </div>
 
+        {/* Profile incomplete banner */}
+        {profileIncomplete && user?.role === 'client' && (
+          <div className="flex flex-col gap-3 p-5 bg-red-50 border border-red-200 rounded-xl mb-6">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+              </svg>
+              <div>
+                <p className="text-sm font-semibold text-red-700 mb-1" style={{ margin: '0 0 4px' }}>
+                  Профиль не заполнен
+                </p>
+                <p className="text-sm text-red-600" style={{ margin: 0 }}>
+                  Для подачи заявления необходимо заполнить все реквизиты организации и личные данные (ИИН, телефон). Эти данные используются для формирования договора.
+                </p>
+              </div>
+            </div>
+            <button onClick={() => navigate('/profile')}
+              className="w-full py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors"
+              style={{ marginBottom: 0 }}>
+              Заполнить профиль
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl mb-6 text-red-600 text-sm">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -376,24 +422,29 @@ export default function CreateOrder() {
 
               {staticFields.length > 0 && (
                 <div className="flex flex-col gap-4">
-                    {staticFields.map(field => (
-                      <div key={field.fieldKey}>
-                        {field.fieldType !== 'checkbox' && (
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                            {field.labelRu} {field.required && '*'}
-                            {!field.required && <span className="text-gray-400 font-normal"> (при наличии)</span>}
-                          </label>
-                        )}
-                        {renderField(field, 0)}
-                      </div>
-                    ))}
+                  {staticFields.map(field => (
+                    <div key={field.fieldKey}>
+                      {field.fieldType !== 'checkbox' && (
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          {field.labelRu} {field.required && '*'}
+                          {!field.required && <span className="text-gray-400 font-normal"> (при наличии)</span>}
+                        </label>
+                      )}
+                      {renderField(field, 0)}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           )}
 
           <button type="submit"
-            className="w-full py-4 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-semibold rounded-xl border-none cursor-pointer text-base transition-colors"
+            disabled={profileIncomplete && user?.role === 'client'}
+            className={`w-full py-4 text-white font-semibold rounded-xl border-none text-base transition-colors ${
+              profileIncomplete && user?.role === 'client'
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-[#00B2FF] hover:bg-[#0095D9] cursor-pointer'
+            }`}
             style={{ marginBottom: 0 }}>
             Оформить заявление
           </button>
