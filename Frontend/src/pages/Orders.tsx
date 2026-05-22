@@ -505,7 +505,8 @@ export default function Orders() {
               const cd = contractData[order.id];
               return (
                 <div key={order.id}
-                  className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-[#00B2FF]/30 transition-all">
+                    className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-[#00B2FF]/30 transition-all cursor-pointer"
+                    onClick={() => navigate(`/orders/${order.id}`)}>
 
                   {/* Заголовок */}
                   <div className="flex items-center justify-between mb-4 flex-wrap gap-3">

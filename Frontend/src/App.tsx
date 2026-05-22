@@ -23,6 +23,8 @@ import Approver from './pages/Approver';
 import Director from './pages/Director';
 import './App.css';
 import ClientOrders from './pages/ClientOrders';
+import BuhgalterOrder from './pages/BuhgalterOrder';
+
 
 
 const NO_HEADER_PATHS = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
@@ -44,6 +46,7 @@ function AppLayout() {
           <Route path="/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
           <Route path="/create-order" element={<ProtectedRoute requiredRoles={['client']}><CreateOrder /></ProtectedRoute>} />
           <Route path="/orders" element={<ProtectedRoute requiredRoles={['manager']}><Orders /></ProtectedRoute>} />
+          <Route path="/orders/:id" element={<ProtectedRoute requiredRoles={['manager']}><BuhgalterOrder /></ProtectedRoute>} />
           <Route path="/my-orders" element={<ProtectedRoute requiredRoles={['client']}><ClientOrders /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/queue" element={<ProtectedRoute requiredRoles={['metrolog']}><Queue /></ProtectedRoute>} />
