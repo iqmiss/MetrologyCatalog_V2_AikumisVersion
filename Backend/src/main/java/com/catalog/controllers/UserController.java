@@ -1,96 +1,125 @@
 package com.catalog.controllers;
 
 import com.catalog.models.User;
+import com.catalog.models.Company;
 import com.catalog.repository.UserRepository;
+import com.catalog.repository.CompanyRepository;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import java.util.HashMap;
 import java.util.Map;
 
-// Контроллер для управления профилем пользователя
-// Обрабатывает запросы по пути /api/profile
 @RestController
 @RequestMapping("/api/profile")
 @CrossOrigin(origins = "http://localhost:5173")
 public class UserController {
 
     private final UserRepository userRepository;
+    private final CompanyRepository companyRepository;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserRepository userRepository, CompanyRepository companyRepository) {
         this.userRepository = userRepository;
+        this.companyRepository = companyRepository;
     }
 
     // GET /api/profile?userId=1
-    // Возвращает профиль пользователя по его ID
     @GetMapping
     public ResponseEntity<?> getProfile(@RequestParam int userId) {
         try {
-            // findById теперь возвращает Optional — используем orElse(null)
             User user = userRepository.findById(userId).orElse(null);
-
-            // Если пользователь не найден — возвращаем 404
-            if (user == null) {
+            if (user == null)
                 return ResponseEntity.status(404).body(errorResponse("Пользователь не найден"));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("user", user);
+
+            if (user.getCompanyId() != null) {
+                Company company = companyRepository.findById(user.getCompanyId()).orElse(null);
+                response.put("company", company);
             }
 
-            return ResponseEntity.ok(user);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при получении профиля"));
         }
     }
 
     // PUT /api/profile
-    // Обновляет данные профиля пользователя (ФИО, телефон, email)
     @PutMapping
     public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileRequest request) {
         try {
-            // Проверяем что ID пользователя передан
-            if (request.getId() == null) {
+            if (request.getId() == null)
                 return ResponseEntity.status(400).body(errorResponse("ID пользователя не указан"));
-            }
 
-            // Ищем пользователя в БД
             User user = userRepository.findById(request.getId()).orElse(null);
-            if (user == null) {
+            if (user == null)
                 return ResponseEntity.status(404).body(errorResponse("Пользователь не найден"));
-            }
 
-            // Обновляем только те поля которые переданы в запросе (частичное обновление)
-            if (request.getFullName() != null) {
-                user.setFullName(request.getFullName());
-            }
-            if (request.getPhone() != null) {
-                user.setPhone(request.getPhone());
-            }
-            if (request.getEmail() != null) {
-                user.setEmail(request.getEmail());
-            }
-
+            if (request.getFullName() != null) user.setFullName(request.getFullName());
+            if (request.getPhone() != null) user.setPhone(request.getPhone());
+            if (request.getEmail() != null) user.setEmail(request.getEmail());
+            if (request.getIin() != null) user.setIin(request.getIin());
             userRepository.save(user);
 
-            return ResponseEntity.ok(user);
+            // Update company fields if provided
+            if (user.getCompanyId() != null && request.getCompany() != null) {
+                Company company = companyRepository.findById(user.getCompanyId()).orElse(null);
+                if (company != null) {
+                    UpdateCompanyRequest c = request.getCompany();
+                    if (c.getDirectorName() != null) company.setDirectorName(c.getDirectorName());
+                    if (c.getDirectorPosition() != null) company.setDirectorPosition(c.getDirectorPosition());
+                    if (c.getIik() != null) company.setIik(c.getIik());
+                    if (c.getBankName() != null) company.setBankName(c.getBankName());
+                    if (c.getBik() != null) company.setBik(c.getBik());
+                    if (c.getKbe() != null) company.setKbe(c.getKbe());
+                    if (c.getLegalAddress() != null) company.setLegalAddress(c.getLegalAddress());
+                    if (c.getAddress() != null) company.setAddress(c.getAddress());
+                    if (c.getPhone() != null) company.setPhone(c.getPhone());
+                    companyRepository.save(company);
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("user", user);
+            if (user.getCompanyId() != null) {
+                companyRepository.findById(user.getCompanyId()).ifPresent(c -> response.put("company", c));
+            }
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(errorResponse("Ошибка при обновлении профиля"));
         }
     }
 
-    // Вспомогательный метод для формирования ответа с ошибкой
     private Map<String, String> errorResponse(String message) {
         Map<String, String> response = new HashMap<>();
         response.put("message", message);
         return response;
     }
 
-    // Класс для десериализации тела запроса при обновлении профиля
     public static class UpdateProfileRequest {
         public Integer id;
-        public String fullName;
-        public String email;
-        public String phone;
+        public String fullName, email, phone, iin;
+        public UpdateCompanyRequest company;
 
         public Integer getId() { return id; }
         public String getFullName() { return fullName; }
         public String getEmail() { return email; }
+        public String getPhone() { return phone; }
+        public String getIin() { return iin; }
+        public UpdateCompanyRequest getCompany() { return company; }
+    }
+
+    public static class UpdateCompanyRequest {
+        public String directorName, directorPosition, iik, bankName, bik, kbe, legalAddress, address, phone;
+
+        public String getDirectorName() { return directorName; }
+        public String getDirectorPosition() { return directorPosition; }
+        public String getIik() { return iik; }
+        public String getBankName() { return bankName; }
+        public String getBik() { return bik; }
+        public String getKbe() { return kbe; }
+        public String getLegalAddress() { return legalAddress; }
+        public String getAddress() { return address; }
         public String getPhone() { return phone; }
     }
 }

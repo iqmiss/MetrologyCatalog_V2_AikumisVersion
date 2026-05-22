@@ -130,7 +130,7 @@ export const laboratoryApi = {
 };
 
 export const userApi = {
-  getProfile: () => api.get('/profile'),
+  getProfile: (userId?: number) => api.get('/profile', { params: { userId } }),
   updateProfile: (data: any) => api.put('/profile', data),
   getClients: () => api.get('/users/clients'),
 };
