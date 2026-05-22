@@ -83,6 +83,44 @@ const colorMap: Record<string, { bg: string; text: string; border: string }> = {
   red:    { bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-200' },
 };
 
+const fieldLabels: Record<string, string> = {
+  si_name: 'Наименование СИ',
+  characteristics: 'Метрологические характеристики',
+  producer: 'Производитель',
+  has_software: 'Наличие ПО',
+  date_place: 'Дата и место',
+  serial_numbers: 'Заводские номера',
+  modified_characteristics: 'Изменённые характеристики',
+  quantity: 'Количество',
+  org_name: 'Наименование организации',
+  director_name: 'Руководитель',
+  requisites: 'Реквизиты',
+  legal_address: 'Юридический адрес',
+  mailing_address: 'Адрес рассылки',
+  program_type: 'Программа МЛС',
+  si_description: 'Описание СИ',
+  contact_name: 'Контактное лицо',
+  contact_position: 'Должность',
+  contact_phone: 'Телефон',
+  contact_email: 'Email',
+  needs_contract: 'Форма договора',
+  applicant_fullname: 'ФИО заявителя',
+  applicant_email: 'Email заявителя',
+  applicant_phone: 'Телефон заявителя',
+  applicant_iin: 'ИИН заявителя',
+  company_name: 'Организация',
+  company_bin: 'БИН',
+  company_director_name: 'Руководитель',
+  company_director_position: 'Должность',
+  company_iik: 'ИИК',
+  company_bank_name: 'Банк',
+  company_bik: 'БИК',
+  company_kbe: 'КБЕ',
+  company_legal_address: 'Юр. адрес',
+  company_address: 'Факт. адрес',
+  company_phone: 'Телефон орг.',
+};
+
 export default function ClientOrders() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -92,10 +130,10 @@ export default function ClientOrders() {
   const [contracts, setContracts] = useState<Record<number, Contract>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+  const [orderFields, setOrderFields] = useState<Record<number, any[]>>({});
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
     try {
@@ -104,16 +142,14 @@ export default function ClientOrders() {
         orderApi.getMyOrders(user?.id || 0),
         serviceApi.getAll(),
       ]);
-      setOrders(ordersRes.data);
+      setOrders([...ordersRes.data].reverse());
       setServices(servicesRes.data);
 
-      // Load contracts for each order
       ordersRes.data.forEach((order: Order) => {
         contractApi.getByOrderId(order.id)
           .then(res => setContracts(prev => ({ ...prev, [order.id]: res.data })))
           .catch(() => {});
 
-        // Load subservice if present
         if (order.subserviceId) {
           subserviceApi.getByServiceId(order.serviceId)
             .then(res => {
@@ -128,6 +164,22 @@ export default function ClientOrders() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadOrderFields = async (orderId: number) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+      return;
+    }
+    if (orderFields[orderId]) {
+      setExpandedOrderId(orderId);
+      return;
+    }
+    try {
+      const res = await orderApi.getFields(orderId);
+      setOrderFields(prev => ({ ...prev, [orderId]: res.data }));
+      setExpandedOrderId(orderId);
+    } catch {}
   };
 
   const handleCancel = async (orderId: number) => {
@@ -247,6 +299,8 @@ export default function ClientOrders() {
               const canSign = contract?.approverSigned && contract?.financierSigned &&
                               contract?.directorSigned && !contract?.clientSigned;
               const isCancellable = ['pending_contract', 'revision'].includes(order.status);
+              const isExpanded = expandedOrderId === order.id;
+              const fields = orderFields[order.id] || [];
 
               return (
                 <div key={order.id} className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all">
@@ -311,6 +365,14 @@ export default function ClientOrders() {
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 mt-2">
+                    <button onClick={() => loadOrderFields(order.id)}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium rounded-lg border-none cursor-pointer text-sm transition-colors flex items-center gap-1.5"
+                      style={{ marginBottom: 0 }}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>
+                      </svg>
+                      {isExpanded ? 'Скрыть' : 'Содержимое заявки'}
+                    </button>
 
                     {isCancellable && (
                       <button onClick={() => handleCancel(order.id)}
@@ -361,6 +423,82 @@ export default function ClientOrders() {
                       </button>
                     )}
                   </div>
+
+                  {/* Expanded field values */}
+                  {isExpanded && (
+                    <div className="mt-4 border-t border-gray-100 pt-4">
+                      {fields.length === 0 ? (
+                        <p className="text-sm text-gray-400">Данные не найдены</p>
+                      ) : (
+                        <div className="flex flex-col gap-1">
+                          {(() => {
+                            const nonFile = fields.filter((f: any) => f.fieldValue && !f.fieldValue.startsWith('data:') && f.fieldValue !== 'true');
+                            const snapshotFields = nonFile.filter((f: any) => f.filledByRole === 'client_snapshot');
+                            const formFields = nonFile.filter((f: any) => f.filledByRole !== 'client_snapshot');
+                            const hasFiles = fields.some((f: any) => f.fieldValue?.startsWith('data:'));
+                            const hasObligation = fields.some((f: any) => f.fieldValue === 'true');
+
+                            const rowGroups: Record<number, any[]> = {};
+                            const staticFormFields: any[] = [];
+                            formFields.forEach((f: any) => {
+                              if (f.rowIndex > 0 || formFields.filter((x: any) => x.fieldKey === f.fieldKey).length > 1) {
+                                if (!rowGroups[f.rowIndex]) rowGroups[f.rowIndex] = [];
+                                rowGroups[f.rowIndex].push(f);
+                              } else {
+                                staticFormFields.push(f);
+                              }
+                            });
+
+                            return (
+                              <>
+                                {snapshotFields.length > 0 && (
+                                  <div className="bg-blue-50 rounded-xl p-3 mb-3">
+                                    <p className="text-xs font-semibold text-blue-700 mb-2" style={{ margin: '0 0 8px' }}>
+                                      Данные заявителя на момент подачи
+                                    </p>
+                                    {snapshotFields.map((f: any, i: number) => (
+                                      <div key={i} className="flex justify-between items-start gap-3 py-1.5 border-b border-blue-100 last:border-0">
+                                        <span className="text-xs text-blue-500">{fieldLabels[f.fieldKey] || f.fieldKey}</span>
+                                        <span className="text-xs text-blue-800 text-right max-w-[60%]">{f.fieldValue}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {Object.keys(rowGroups).length > 0 && Object.entries(rowGroups).map(([rowIdx, rowFields]) => (
+                                  <div key={rowIdx} className="bg-gray-50 rounded-xl p-3 mb-2">
+                                    <p className="text-xs font-semibold text-gray-500 mb-2" style={{ margin: '0 0 8px' }}>
+                                      Прибор #{parseInt(rowIdx) + 1}
+                                    </p>
+                                    {(rowFields as any[]).map((f: any, i: number) => (
+                                      <div key={i} className="flex justify-between items-start gap-3 py-1.5 border-b border-gray-100 last:border-0">
+                                        <span className="text-xs text-gray-400">{fieldLabels[f.fieldKey] || f.fieldKey}</span>
+                                        <span className="text-xs text-gray-700 text-right max-w-[60%]">{f.fieldValue}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ))}
+
+                                {staticFormFields.map((f: any, i: number) => (
+                                  <div key={i} className="flex justify-between items-start gap-3 py-1.5 border-b border-gray-50">
+                                    <span className="text-xs text-gray-400">{fieldLabels[f.fieldKey] || f.fieldKey}</span>
+                                    <span className="text-xs text-gray-700 text-right max-w-[60%]">{f.fieldValue}</span>
+                                  </div>
+                                ))}
+
+                                {hasFiles && (
+                                  <p className="text-xs text-blue-600 mt-2">📎 Документы прикреплены</p>
+                                )}
+                                {hasObligation && (
+                                  <p className="text-xs text-green-600 mt-1">✓ Обязательство подтверждено</p>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

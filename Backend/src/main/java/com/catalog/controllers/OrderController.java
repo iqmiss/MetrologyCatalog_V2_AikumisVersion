@@ -477,7 +477,8 @@ public class OrderController {
 
             return ResponseEntity.ok(applicationFieldValueRepository.findByOrderId(id));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(errorResponse("Ошибка при сохранении полей"));
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(errorResponse("Ошибка при сохранении полей: " + e.getMessage()));
         }
     }
 

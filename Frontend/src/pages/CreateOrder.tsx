@@ -216,8 +216,84 @@ export default function CreateOrder() {
             })),
       };
 
-      const orderRes = await orderApi.create(orderPayload);
-      const orderId = orderRes.data.id;
+    const orderRes = await orderApi.create(orderPayload);
+    const orderId = orderRes.data?.id;
+
+    if (!orderId) {
+      setError('Ошибка при создании заявки: ID не получен');
+      return;
+}
+
+console.log('About to save fields:', { fieldsLength: fields.length, role: user?.role, orderId });
+if (fields.length > 0 || user?.role === 'client') {
+        const fieldPayload: any[] = [];
+
+        // Snapshot user and company data at submission time
+        if (user?.role === 'client') {
+          const profileRes = await userApi.getProfile(user?.id);
+          const profileData = profileRes.data;
+          const u = profileData.user || profileData;
+          const c = profileData.company;
+
+          console.log('Profile snapshot:', { u, c });
+
+          const snapshotFields: Record<string, string> = {
+            'applicant_fullname': u.fullName || '',
+            'applicant_email': u.email || '',
+            'applicant_phone': u.phone || '',
+            'applicant_iin': u.iin || '',
+          };
+
+          if (c) {
+            snapshotFields['company_name'] = c.name || '';
+            snapshotFields['company_bin'] = c.bin || '';
+            snapshotFields['company_director_name'] = c.directorName || '';
+            snapshotFields['company_director_position'] = c.directorPosition || '';
+            snapshotFields['company_iik'] = c.iik || '';
+            snapshotFields['company_bank_name'] = c.bankName || '';
+            snapshotFields['company_bik'] = c.bik || '';
+            snapshotFields['company_kbe'] = c.kbe || '';
+            snapshotFields['company_legal_address'] = c.legalAddress || '';
+            snapshotFields['company_address'] = c.address || '';
+            snapshotFields['company_phone'] = c.phone || '';
+          }
+
+          Object.entries(snapshotFields).forEach(([key, value]) => {
+            fieldPayload.push({
+              fieldKey: key,
+              fieldValue: value,
+              rowIndex: 0,
+              filledByRole: 'client_snapshot',
+            });
+          });
+        }
+
+        // Save dynamic form fields
+        for (const field of fields) {
+          if (field.isRepeating) {
+            tableRows.forEach(rowIndex => {
+              fieldPayload.push({
+                fieldKey: field.fieldKey,
+                fieldValue: getFieldValue(field.fieldKey, rowIndex),
+                rowIndex,
+                filledByRole: 'client',
+              });
+            });
+          } else {
+            fieldPayload.push({
+              fieldKey: field.fieldKey,
+              fieldValue: getFieldValue(field.fieldKey, 0),
+              rowIndex: 0,
+              filledByRole: 'client',
+            });
+          }
+        }
+
+console.log('Field payload to save:', fieldPayload.filter(f => f.filledByRole === 'client_snapshot'));
+        if (fieldPayload.length > 0) {
+          await orderApi.saveFields(orderId, fieldPayload);
+        }
+      }
 
       if (fields.length > 0) {
         const fieldPayload: any[] = [];

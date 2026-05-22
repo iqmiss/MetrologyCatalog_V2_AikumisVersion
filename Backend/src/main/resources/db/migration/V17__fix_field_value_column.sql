@@ -1,0 +1,2 @@
+ALTER TABLE application_field_values
+MODIFY COLUMN field_value LONGTEXT;
