@@ -17,6 +17,13 @@ export interface Company {
   address?: string;
   phone?: string;
   email?: string;
+  directorName?: string;
+  directorPosition?: string;
+  iik?: string;
+  bankName?: string;
+  bik?: string;
+  kbe?: string;
+  legalAddress?: string;
 }
 
 export interface Laboratory {
