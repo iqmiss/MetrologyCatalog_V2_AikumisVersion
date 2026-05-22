@@ -17,7 +17,7 @@ public class ApplicationFieldValue {
     @Column(name = "field_key", nullable = false)
     private String fieldKey;
 
-    @Column(name = "field_value", columnDefinition = "TEXT")
+    @Column(name = "field_value", columnDefinition = "LONGTEXT")
     private String fieldValue;
 
     @Column(name = "row_index")

@@ -583,5 +583,9 @@ public class OrderController {
     public static class FieldValueRequest {
         public String fieldKey, fieldValue, filledByRole;
         public Integer rowIndex;
+        public String getFieldKey() { return fieldKey; }
+        public String getFieldValue() { return fieldValue; }
+        public String getFilledByRole() { return filledByRole; }
+        public Integer getRowIndex() { return rowIndex; }
     }
 }
