@@ -37,7 +37,12 @@ export default function CreateOrder() {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+      fetchData();
+      if (location.state?.orderId && location.state?.subserviceId) {
+        loadExistingFields(location.state.orderId);
+      }
+    }, []);
 
   useEffect(() => {
     if (selectedSubserviceId) loadSubserviceFields(selectedSubserviceId);
@@ -84,14 +89,35 @@ export default function CreateOrder() {
         subserviceApi.getById(subserviceId),
         subserviceApi.getFields(subserviceId),
       ]);
-      setSubservice(subRes.data);
-      setFields(fieldsRes.data);
-      setFieldValues({});
-      setTableRows([0]);
+        setSubservice(subRes.data);
+        setFields(fieldsRes.data);
+        if (!location.state?.orderId) {
+          setFieldValues({});
+          setTableRows([0]);
+        }
     } catch {
       setError('Ошибка при загрузке полей формы');
     }
   };
+
+    const loadExistingFields = async (orderId: number) => {
+      try {
+        const res = await orderApi.getFields(orderId);
+        const existing = res.data.filter((f: any) => f.filledByRole === 'client' && f.fieldValue);
+        const newValues: Record<string, Record<number, string>> = {};
+        existing.forEach((f: any) => {
+          if (!newValues[f.fieldKey]) newValues[f.fieldKey] = {};
+          newValues[f.fieldKey][f.rowIndex] = f.fieldValue;
+        });
+        setFieldValues(newValues);
+
+        // Restore table rows from existing repeating fields
+        const rowIndices = [...new Set(existing.filter((f: any) => f.rowIndex > 0 || existing.filter((x: any) => x.fieldKey === f.fieldKey).length > 1).map((f: any) => f.rowIndex))];
+        if (rowIndices.length > 0) {
+          setTableRows(rowIndices.sort((a, b) => a - b));
+        }
+      } catch {}
+    };
 
   const getFieldValue = (fieldKey: string, rowIndex: number) =>
     fieldValues[fieldKey]?.[rowIndex] || '';
@@ -155,16 +181,31 @@ export default function CreateOrder() {
     }
 
     if (field.fieldType === 'file') {
-      return (
-        <input type="file" onChange={e => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => setFieldValue(field.fieldKey, rowIndex, reader.result as string);
-          reader.readAsDataURL(file);
-        }} className={inputClass} style={{ fontFamily: 'inherit', marginBottom: 0 }} />
-      );
-    }
+          const existingValue = getFieldValue(field.fieldKey, rowIndex);
+          const hasExistingFile = existingValue && existingValue.startsWith('data:');
+          return (
+            <div className="flex flex-col gap-2">
+              {hasExistingFile && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                  </svg>
+                  📎 {getFieldValue(field.fieldKey + '_filename', rowIndex) || 'Файл загружен'} — загрузите новый, чтобы заменить
+                </div>
+              )}
+              <input type="file" onChange={e => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  setFieldValue(field.fieldKey, rowIndex, reader.result as string);
+                  setFieldValue(field.fieldKey + '_filename', rowIndex, file.name);
+                };
+                reader.readAsDataURL(file);
+              }} className={inputClass} style={{ fontFamily: 'inherit', marginBottom: 0 }} />
+            </div>
+          );
+        }
 
     return (
       <input type={field.fieldType === 'number' ? 'number' : field.fieldType === 'date' ? 'date' : 'text'}
@@ -216,8 +257,23 @@ export default function CreateOrder() {
             })),
       };
 
-    const orderRes = await orderApi.create(orderPayload);
-    const orderId = orderRes.data?.id;
+    const existingOrderId = location.state?.orderId;
+      let orderId: number;
+
+      if (existingOrderId) {
+        await orderApi.resubmit(existingOrderId, {
+          serviceId: selectedServiceId,
+          subserviceId: selectedSubserviceId || null,
+        });
+        orderId = existingOrderId;
+      } else {
+        const orderRes = await orderApi.create(orderPayload);
+        orderId = orderRes.data?.id;
+        if (!orderId) {
+          setError('Ошибка при создании заявки: ID не получен');
+          return;
+        }
+      }
 
     if (!orderId) {
       setError('Ошибка при создании заявки: ID не получен');
@@ -278,6 +334,16 @@ if (fields.length > 0 || user?.role === 'client') {
                 rowIndex,
                 filledByRole: 'client',
               });
+              // Save filename if file field
+              if (field.fieldType === 'file') {
+                const filename = getFieldValue(field.fieldKey + '_filename', rowIndex);
+                if (filename) fieldPayload.push({
+                  fieldKey: field.fieldKey + '_filename',
+                  fieldValue: filename,
+                  rowIndex,
+                  filledByRole: 'client',
+                });
+              }
             });
           } else {
             fieldPayload.push({
@@ -286,6 +352,16 @@ if (fields.length > 0 || user?.role === 'client') {
               rowIndex: 0,
               filledByRole: 'client',
             });
+            // Save filename if file field
+            if (field.fieldType === 'file') {
+              const filename = getFieldValue(field.fieldKey + '_filename', 0);
+              if (filename) fieldPayload.push({
+                fieldKey: field.fieldKey + '_filename',
+                fieldValue: filename,
+                rowIndex: 0,
+                filledByRole: 'client',
+              });
+            }
           }
         }
 
@@ -498,7 +574,7 @@ console.log('Field payload to save:', fieldPayload.filter(f => f.filledByRole ==
                 : 'bg-[#00B2FF] hover:bg-[#0095D9] cursor-pointer'
             }`}
             style={{ marginBottom: 0 }}>
-            Оформить заявление
+            {location.state?.orderId ? 'Отправить исправленное заявление' : 'Оформить заявление'}
           </button>
         </form>
       </div>

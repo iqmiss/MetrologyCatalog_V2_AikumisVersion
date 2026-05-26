@@ -92,7 +92,7 @@ export default function BuhgalterOrder() {
       setLaboratories(labsRes.data);
       setFieldValues(fieldsRes.data);
 
-      // Pre-fill buhgalter fields from order if already set
+// Pre-fill basic order fields
       setBuhForm(prev => ({
         ...prev,
         labId: o.labId?.toString() || '',
@@ -100,6 +100,24 @@ export default function BuhgalterOrder() {
         serviceAddress: o.serviceAddress || '',
         responsibleDepartment: o.responsibleDepartment || '',
       }));
+
+      // Pre-fill buhgalter fields from application_field_values
+      const buhFields = fieldsRes.data.filter((f: any) => f.filledByRole === 'buhgalter');
+      if (buhFields.length > 0) {
+        const buhMap: Record<string, string> = {};
+        buhFields.forEach((f: any) => { buhMap[f.fieldKey] = f.fieldValue; });
+        setBuhForm(prev => ({
+          ...prev,
+          contractNumber: buhMap['contract_number'] || '',
+          contractDate: buhMap['contract_date'] || '',
+          contractAmount: buhMap['contract_amount'] || '',
+          contractAmountWords: buhMap['contract_amount_words'] || '',
+          signerName: buhMap['signer_name'] || '',
+          signerPosition: buhMap['signer_position'] || '',
+          signerBasis: buhMap['signer_basis'] || '',
+          city: buhMap['city'] || 'Астана',
+        }));
+      }
 
       // Load service
       if (o.serviceId) {
@@ -126,34 +144,73 @@ export default function BuhgalterOrder() {
     setBuhForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      await orderApi.update(orderId, {
-        labId: buhForm.labId ? parseInt(buhForm.labId) : undefined,
-        dueDate: buhForm.dueDate || undefined,
-        serviceAddress: buhForm.serviceAddress || undefined,
-        responsibleDepartment: buhForm.responsibleDepartment || undefined,
-      });
-      setSuccess('Сохранено');
-      setTimeout(() => setSuccess(''), 2000);
-    } catch {
-      setError('Ошибка при сохранении');
+    const handleSave = async () => {
+        console.log('handleSave called', { orderId, buhForm });
+        try {
+            setIsSaving(true);
+
+        // Save basic order fields
+        await orderApi.update(orderId, {
+          labId: buhForm.labId ? parseInt(buhForm.labId) : undefined,
+          dueDate: buhForm.dueDate || undefined,
+          serviceAddress: buhForm.serviceAddress || undefined,
+          responsibleDepartment: buhForm.responsibleDepartment || undefined,
+        });
+
+        // Save бухгалтер fields to application_field_values
+        const buhFields = [
+          { fieldKey: 'contract_number', fieldValue: buhForm.contractNumber },
+          { fieldKey: 'contract_date', fieldValue: buhForm.contractDate },
+          { fieldKey: 'contract_amount', fieldValue: buhForm.contractAmount },
+          { fieldKey: 'contract_amount_words', fieldValue: buhForm.contractAmountWords },
+          { fieldKey: 'signer_name', fieldValue: buhForm.signerName },
+          { fieldKey: 'signer_position', fieldValue: buhForm.signerPosition },
+          { fieldKey: 'signer_basis', fieldValue: buhForm.signerBasis },
+          { fieldKey: 'city', fieldValue: buhForm.city },
+        ].filter(f => f.fieldValue).map(f => ({
+          ...f,
+          rowIndex: 0,
+          filledByRole: 'buhgalter',
+        }));
+
+        console.log('buhFields to save:', buhFields);
+
+        if (buhFields.length > 0) {
+          // Get existing fields, remove old buhgalter fields, add new ones
+          const existingRes = await orderApi.getFields(orderId);
+          const existingFields = existingRes.data.filter((f: any) => f.filledByRole !== 'buhgalter');
+          const savePayload = [...existingFields.map((f: any) => ({
+            fieldKey: f.fieldKey,
+            fieldValue: f.fieldValue,
+            rowIndex: f.rowIndex,
+            filledByRole: f.filledByRole,
+          })), ...buhFields];
+          console.log('Saving payload size:', savePayload.length);
+          await orderApi.saveFields(orderId, savePayload);
+          console.log('Save successful');
+        }
+
+        setSuccess('Сохранено');
+        setTimeout(() => setSuccess(''), 2000);
+    } catch (err: any) {
+      setError('Ошибка при сохранении: ' + (err.response?.data?.message || err.message));
     } finally {
-      setIsSaving(false);
-    }
-  };
+        setIsSaving(false);
+      }
+    };
 
   const handleReturn = async () => {
     if (!returnComment.trim()) return;
     try {
       await orderApi.returnToRevision(orderId, returnComment.trim());
-      navigate('/orders');
+      setShowReturnModal(false);
+      setReturnComment('');
+      setSuccess('Заявка возвращена клиенту на доработку');
+      setTimeout(() => navigate('/orders'), 1500);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка при возврате');
     }
   };
-
   const handleSendForApproval = async () => {
     if (!contract?.contractFileName) {
       setError('Сначала загрузите файл договора');
@@ -420,23 +477,32 @@ export default function BuhgalterOrder() {
             </div>
 
             {/* Actions */}
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-wrap gap-3">
-              <button onClick={handleSave} disabled={isSaving}
-                className="flex-1 py-2.5 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors"
-                style={{ marginBottom: 0 }}>
-                {isSaving ? 'Сохранение...' : 'Сохранить'}
-              </button>
-              <button onClick={() => setShowReturnModal(true)}
-                className="flex-1 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-semibold rounded-xl border border-orange-200 cursor-pointer text-sm transition-colors"
-                style={{ marginBottom: 0 }}>
-                Вернуть клиенту
-              </button>
-              <button onClick={handleSendForApproval}
-                className="flex-1 py-2.5 bg-[#0A2E5C] hover:bg-[#0d3a73] text-white font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors"
-                style={{ marginBottom: 0 }}>
-                На согласование
-              </button>
-            </div>
+            {order.status === 'revision' ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-700 flex items-center gap-3">
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+                </svg>
+                Заявка возвращена клиенту на доработку. Ожидайте исправлений.
+              </div>
+            ) : (
+              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-wrap gap-3">
+                <button onClick={handleSave} disabled={isSaving}
+                  className="flex-1 py-2.5 bg-[#00B2FF] hover:bg-[#0095D9] text-white font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors"
+                  style={{ marginBottom: 0 }}>
+                  {isSaving ? 'Сохранение...' : 'Сохранить'}
+                </button>
+                <button onClick={() => setShowReturnModal(true)}
+                  className="flex-1 py-2.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-semibold rounded-xl border border-orange-200 cursor-pointer text-sm transition-colors"
+                  style={{ marginBottom: 0 }}>
+                  Вернуть клиенту
+                </button>
+                <button onClick={handleSendForApproval}
+                  className="flex-1 py-2.5 bg-[#0A2E5C] hover:bg-[#0d3a73] text-white font-semibold rounded-xl border-none cursor-pointer text-sm transition-colors"
+                  style={{ marginBottom: 0 }}>
+                  На согласование
+                </button>
+              </div>
+            )}
           </div>
 
           {/* RIGHT PANEL — Live contract preview */}

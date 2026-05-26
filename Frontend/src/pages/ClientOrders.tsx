@@ -434,7 +434,7 @@ export default function ClientOrders() {
                           {(() => {
                             const nonFile = fields.filter((f: any) => f.fieldValue && !f.fieldValue.startsWith('data:') && f.fieldValue !== 'true');
                             const snapshotFields = nonFile.filter((f: any) => f.filledByRole === 'client_snapshot');
-                            const formFields = nonFile.filter((f: any) => f.filledByRole !== 'client_snapshot');
+                            const formFields = nonFile.filter((f: any) => f.filledByRole === 'client');
                             const hasFiles = fields.some((f: any) => f.fieldValue?.startsWith('data:'));
                             const hasObligation = fields.some((f: any) => f.fieldValue === 'true');
 
