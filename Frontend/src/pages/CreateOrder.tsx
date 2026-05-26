@@ -295,30 +295,6 @@ console.log('Field payload to save:', fieldPayload.filter(f => f.filledByRole ==
         }
       }
 
-      if (fields.length > 0) {
-        const fieldPayload: any[] = [];
-        for (const field of fields) {
-          if (field.isRepeating) {
-            tableRows.forEach(rowIndex => {
-              fieldPayload.push({
-                fieldKey: field.fieldKey,
-                fieldValue: getFieldValue(field.fieldKey, rowIndex),
-                rowIndex,
-                filledByRole: 'client',
-              });
-            });
-          } else {
-            fieldPayload.push({
-              fieldKey: field.fieldKey,
-              fieldValue: getFieldValue(field.fieldKey, 0),
-              rowIndex: 0,
-              filledByRole: 'client',
-            });
-          }
-        }
-        await orderApi.saveFields(orderId, fieldPayload);
-      }
-
       setSuccess('Заявка успешно оформлена!');
       setTimeout(() => navigate(user?.role === 'client' ? '/my-orders' : '/orders'), 1500);
     } catch (err: any) {
